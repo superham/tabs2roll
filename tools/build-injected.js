@@ -23,9 +23,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SOURCES = ["src/parse/tabshape.js", "src/extract/sites/ultimate-guitar.js", "src/extract/sites/generic.js", "src/extract/sites/page.js"];
 export const OUTPUT = "src/extract/injected.js";
 
-/** Short content hash, so a running browser can report which build it has. */
-export function buildStamp(parts) {
-  return createHash("sha256").update(parts.join("")).digest("hex").slice(0, 8);
+/** Where the injected script leaves its result for the popup to collect. */
+export const RESULT_GLOBAL = "__tab2rollResult";
+
+/**
+ * Short content hash of the whole generated script, so a running browser can
+ * report exactly which build it has. It covers the wrapper as well as the
+ * sources: a change to either has to move the stamp, or it is useless for
+ * telling one build from another.
+ */
+export function buildStamp(body) {
+  return createHash("sha256").update(Array.isArray(body) ? body.join("\n") : String(body)).digest("hex").slice(0, 8);
 }
 
 export function buildInjected() {
@@ -36,7 +44,23 @@ export function buildInjected() {
     if (/^\s*export\s/m.test(stripped)) throw new Error(`${rel}: only "export function/const/let/class" declarations are supported`);
     return `// ---- ${rel} ----\n${stripped.trim()}\n`;
   });
-  const stamp = buildStamp(parts);
+  const body = [
+    "(() => {",
+    '"use strict";',
+    "%%BUILD%%",
+    "",
+    ...parts,
+    "// ---- run ----",
+    "var RESULT = extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab, looksLikeChordSheet, looksLikeSong, isChordOnlyLine, isLyricLine, isSectionLine });",
+    "// Firefox does not reliably hand back a file-injected script's completion",
+    "// value, so leave the result where a second, tiny injection can read it.",
+    "// This is the extension's own isolated sandbox, not the page's window.",
+    `try { globalThis[${JSON.stringify(RESULT_GLOBAL)}] = RESULT; } catch (err) { /* nothing to do */ }`,
+    "return RESULT;",
+    "})();",
+    "",
+  ];
+  const stamp = buildStamp(body);
   return [
     "/* GENERATED FILE — do not edit by hand. Rebuild with: npm run build",
     ` * Built from: ${SOURCES.join(", ")}`,
@@ -45,15 +69,7 @@ export function buildInjected() {
     " * This is the only code tab2roll ever runs inside a web page. It is injected",
     " * on toolbar click (activeTab), reads the page's DOM, returns plain data, and",
     " * touches nothing else: no UI, no styles, no storage, no network. */",
-    "(() => {",
-    '"use strict";',
-    `const EXTRACTOR_BUILD = ${JSON.stringify(stamp)};`,
-    "",
-    ...parts,
-    "// ---- run ----",
-    "return extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab, looksLikeChordSheet, looksLikeSong, isChordOnlyLine, isLyricLine, isSectionLine });",
-    "})();",
-    "",
+    ...body.map((line) => (line === "%%BUILD%%" ? `const EXTRACTOR_BUILD = ${JSON.stringify(stamp)};` : line)),
   ].join("\n");
 }
 

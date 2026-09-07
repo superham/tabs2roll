@@ -1,13 +1,13 @@
 /* GENERATED FILE — do not edit by hand. Rebuild with: npm run build
  * Built from: src/parse/tabshape.js, src/extract/sites/ultimate-guitar.js, src/extract/sites/generic.js, src/extract/sites/page.js
- * Build: ff4241c7
+ * Build: 45a1e21d
  *
  * This is the only code tab2roll ever runs inside a web page. It is injected
  * on toolbar click (activeTab), reads the page's DOM, returns plain data, and
  * touches nothing else: no UI, no styles, no storage, no network. */
 (() => {
 "use strict";
-const EXTRACTOR_BUILD = "ff4241c7";
+const EXTRACTOR_BUILD = "45a1e21d";
 
 // ---- src/parse/tabshape.js ----
 // Shape heuristics — the shared, tested functions that decide whether a blob
@@ -470,5 +470,10 @@ function extractFromPage(doc, shape, sites) {
 }
 
 // ---- run ----
-return extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab, looksLikeChordSheet, looksLikeSong, isChordOnlyLine, isLyricLine, isSectionLine });
+var RESULT = extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab, looksLikeChordSheet, looksLikeSong, isChordOnlyLine, isLyricLine, isSectionLine });
+// Firefox does not reliably hand back a file-injected script's completion
+// value, so leave the result where a second, tiny injection can read it.
+// This is the extension's own isolated sandbox, not the page's window.
+try { globalThis["__tab2rollResult"] = RESULT; } catch (err) { /* nothing to do */ }
+return RESULT;
 })();

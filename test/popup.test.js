@@ -57,7 +57,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
-      getManifest: () => ({ version: "0.1.3" }),
+      getManifest: () => ({ version: "0.1.4" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -67,9 +67,15 @@ const STUB = (scenario) => `
     },
     scripting: {
       executeScript: async (o) => {
-        calls.push(["executeScript", o]);
-        if (scenario.extractThrows) throw new Error("Missing host permission for the tab");
-        return [{ result: scenario.extract }];
+        calls.push(["executeScript", { files: o.files || null, func: !!o.func }]);
+        if (o.files) {
+          if (scenario.extractThrows) throw new Error("Missing host permission for the tab");
+          // The real script parks its answer on a global as well as returning it.
+          globalThis["__tab2rollResult"] = scenario.extract;
+          // Firefox does not always hand back a file-injected script's value.
+          return scenario.noCompletionValue ? [{}] : [{ result: scenario.extract }];
+        }
+        return [{ result: o.func.apply(null, o.args || []) }];
       },
     },
   };
@@ -117,7 +123,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
     // The installed version is shown so a stale add-on is obvious at a glance.
-    assert.equal(await text(page, "#version"), "Version 0.1.3");
+    assert.equal(await text(page, "#version"), "Version 0.1.4");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");
@@ -157,6 +163,26 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     const after = await page.evaluate(() => window.__calls);
     assert.deepEqual(after.filter((c) => c[0] === "tabs.create").map((c) => c[1]), ["/ui/help.html#fl-studio", "/ui/help.html"]);
     assert.ok(after.some((c) => c[0] === "openOptionsPage"));
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("the answer is collected separately when the browser returns nothing for the file", async () => {
+    // Firefox's behaviour: executeScript resolves, but with no value for a
+    // file injection. The extractor still ran, so its answer is fetched with
+    // a second, function-based injection instead of the page reading as empty.
+    const reply = { ok: true, filename: "A - B (tab).mid", kind: "chords", rhythmSource: "guessed", tuningId: null, tracks: ["Guitar (as tabbed)"], title: "B" };
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/x",
+      extract: { ok: true, site: "ultimate-guitar", text: "Am      C\nsome words here\nF       G\nmore words here\nAm      C\nlast words here", title: "Covet", artist: "Basement" },
+      reply,
+      noCompletionValue: true,
+    });
+    assert.equal(await visible(page, "#view-found"), true);
+    assert.equal(await text(page, "#song-title"), "Covet — Basement");
+    const calls = await page.evaluate(() => window.__calls.filter((c) => c[0] === "executeScript").map((c) => c[1]));
+    assert.equal(calls.length, 2, "should fall back to a second injection");
+    assert.deepEqual(calls[0].files, ["extract/injected.js"]);
+    assert.equal(calls[1].func, true);
     assert.deepEqual(errors, []);
   });
 

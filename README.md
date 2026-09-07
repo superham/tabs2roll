@@ -88,12 +88,20 @@ and how many lines of it read as tab, chords or words. Open it from
 `about:debugging#/runtime/this-firefox` with **Inspect** next to tab2roll.
 
 ```
-[tab2roll] page: { ok: false, reason: "none", build: "ff4241c7", chars: 8213,
-                   chordLines: 0, tabLines: 0, looksLikeChords: false, pre: 0 }
+[tab2roll] ran the extractor: { frames: 1, entries: [ { hasResult: true, error: null } ] }
+[tab2roll] page: { ok: true, site: "ultimate-guitar", strategy: "pre",
+                   build: "45a1e21d", chars: 8213, chordLines: 42 }
+[tab2roll] read as: chords { staves: 0, chords: 57, ... }
 ```
 
-`build` is a hash of the injected sources, printed by `npm run build`. If it
-does not match, the browser is running an older copy: reload the add-on.
+`build` is a hash of the whole injected script, printed by `npm run build`,
+and the popup footer shows the installed version. If either does not match,
+the browser is running an older copy: reload the add-on.
+
+`hasResult: false` on the first line means the browser ran the script but did
+not hand its value back. Firefox does this for file injections, so the answer
+is fetched with a second, function-based injection instead; the next console
+line reports whether that worked.
 
 To check a page without the extension at all, paste the contents of
 [tools/page-check.js](tools/page-check.js) into the console of the tab page

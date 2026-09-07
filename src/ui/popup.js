@@ -12,6 +12,7 @@ const P = STRINGS.popup;
 const $ = (id) => document.getElementById(id);
 const VIEWS = ["view-checking", "view-found", "view-notfound", "view-error", "view-success"];
 const INJECTED_SCRIPT = "extract/injected.js";
+const RESULT_GLOBAL = "__tab2rollResult"; // must match tools/build-injected.js
 
 const state = {
   tab: null, // { id, url } of the page the popup opened on
@@ -135,6 +136,55 @@ async function activeTab() {
   }
 }
 
+/** The first usable value out of an executeScript reply, or null. */
+function firstResult(results) {
+  if (!Array.isArray(results)) return null;
+  for (const entry of results) {
+    if (entry && entry.result && typeof entry.result === "object") return entry.result;
+  }
+  return null;
+}
+
+/** What the browser handed back, in a form worth printing to the console. */
+function describeResults(results) {
+  if (!Array.isArray(results)) return { returned: typeof results };
+  return {
+    frames: results.length,
+    entries: results.map((entry) => ({
+      hasResult: !!(entry && entry.result),
+      error: entry && entry.error ? String(entry.error.message || entry.error) : null,
+    })),
+  };
+}
+
+/**
+ * Run the extractor in the page and get its answer back.
+ *
+ * Two routes, because browsers disagree about the first one. Chromium hands
+ * back a file-injected script's completion value; Firefox does not do so
+ * reliably, and returns nothing at all. So the script also parks its answer
+ * on a global in the extension's own sandbox, and a second, tiny injection
+ * fetches it — the return value of an injected FUNCTION is well defined
+ * everywhere.
+ */
+async function runExtractor(tabId) {
+  const injected = await browser.scripting.executeScript({ target: { tabId }, files: [INJECTED_SCRIPT] });
+  console.log("[tab2roll] ran the extractor:", describeResults(injected));
+  const direct = firstResult(injected);
+  if (direct) return direct;
+
+  const collected = await browser.scripting.executeScript({
+    target: { tabId },
+    func: (name) => {
+      const value = globalThis[name];
+      return value && typeof value === "object" ? value : null;
+    },
+    args: [RESULT_GLOBAL],
+  });
+  console.log("[tab2roll] collected the answer separately:", describeResults(collected));
+  return firstResult(collected);
+}
+
 /** Run the injected extractor on the page (activeTab grants access on click). */
 async function lookAtPage() {
   state.page = null;
@@ -142,8 +192,7 @@ async function lookAtPage() {
   if (!state.tab || typeof state.tab.id !== "number") return;
   let result = null;
   try {
-    const results = await browser.scripting.executeScript({ target: { tabId: state.tab.id }, files: [INJECTED_SCRIPT] });
-    result = results && results[0] ? results[0].result : null;
+    result = await runExtractor(state.tab.id);
   } catch (err) {
     // Pages Firefox will not let extensions read (about:, the add-ons site,
     // PDF viewer) land here. That is a "not found", not an error.
