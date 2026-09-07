@@ -64,3 +64,26 @@ test("parseChordSheet: honours the time signature", () => {
   const r = parseChordSheet("C G", { timeSignature: [3, 4] });
   assert.deepEqual([...new Set(r.notes.map((n) => n.start))], [0, 3]);
 });
+
+test("chordLine only strips a section prefix, never an arbitrary header", () => {
+  assert.equal(chordLine("Intro: C G Am F").length, 4);
+  assert.equal(chordLine("Chorus 2: Am F").length, 2);
+  // The bug: "Tuning: E A D G B E" used to parse as six chords and put six
+  // bars of nonsense at the front of every Ultimate Guitar file.
+  assert.equal(chordLine("Tuning: E A D G B E"), null);
+  assert.equal(chordLine("Tuning: \tE A D G B E"), null);
+  assert.equal(chordLine("Key: Ab major"), null);
+  assert.equal(chordLine("Difficulty: Intermediate"), null);
+});
+
+test("parseChordSheet: a capo raises every note so the file matches the record", () => {
+  const plain = parseChordSheet("G Em C D");
+  const capo1 = parseChordSheet("G Em C D", { capo: 1 });
+  assert.equal(plain.notes.length, capo1.notes.length);
+  for (let i = 0; i < plain.notes.length; i++) {
+    assert.equal(capo1.notes[i].midi, plain.notes[i].midi + 1);
+  }
+  // Written G with a capo on 1 sounds as Ab, which is what the page calls the key.
+  assert.equal(capo1.notes[0].midi % 12, (plain.notes[0].midi + 1) % 12);
+  assert.equal(parseChordSheet("G", { capo: 0 }).notes[0].midi, plain.notes[0].midi);
+});

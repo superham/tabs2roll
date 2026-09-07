@@ -82,3 +82,24 @@ test("cleanText strips UG markup, nbsp, unicode dashes and normalises line endin
   assert.equal(cleanText(dirty), "e|--0 -|\nAm    C");
   assert.equal(cleanText(null), "");
 });
+
+test("findTitleAndArtist reads the '<Song> chords by <Artist>' line a page puts up top", () => {
+  assert.deepEqual(findTitleAndArtist(["Tabs", "Courses", "Covet Chords by Basement", "Difficulty: Intermediate"]), { title: "Covet", artist: "Basement" });
+  assert.deepEqual(findTitleAndArtist(["Skip to content", "Perfect chords by Ed Sheeran"]), { title: "Perfect", artist: "Ed Sheeran" });
+  assert.deepEqual(findTitleAndArtist(["Wildwood Flower guitar tab by The Carter Family"]), { title: "Wildwood Flower", artist: "The Carter Family" });
+  assert.deepEqual(findTitleAndArtist(["Rio bass tab by Duran Duran"]), { title: "Rio", artist: "Duran Duran" });
+  // "More songs by ..." in a sidebar is not the song's own title line.
+  assert.equal(findTitleAndArtist(["More songs by Ed Sheeran"]).artist, "");
+});
+
+test("findCapo understands the wordings pages actually use", () => {
+  assert.equal(findCapo(["Capo: Fret 1"]), 1); // GuitarTuna
+  assert.equal(findCapo(["Capo: \tNo capo"]), 0); // Ultimate Guitar
+  assert.equal(findCapo(["capo fret 4"]), 4);
+});
+
+test("detect ignores a page's chord legend and artist index", () => {
+  // Nothing but chord-shaped lines: a legend and an A-Z index, no song.
+  assert.equal(detect("Chords\nE\nC#m\nG#m\nB\nA\nStrumming").kind, "none");
+  assert.equal(detect("All artists\n#\nA\nB\nC\nD\nE\nF\nG\nH").kind, "none");
+});

@@ -42,7 +42,7 @@ export function buildInjected() {
     "",
     ...parts,
     "// ---- run ----",
-    "return extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab });",
+    "return extractFromPage(document, { isTabShapedLine, tabLineCount, looksLikeTab, looksLikeChordSheet, looksLikeSong, isChordOnlyLine, isLyricLine, isSectionLine });",
     "})();",
     "",
   ].join("\n");

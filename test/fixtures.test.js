@@ -79,3 +79,27 @@ test("amazing-grace-chords is a chord sheet with chords and bass tracks", () => 
 test("not-a-tab is neither", () => {
   assert.equal(goldenFor(fixture("not-a-tab")).kind, "none");
 });
+
+test("a whole Ultimate Guitar chord page converts to the song and nothing else", () => {
+  const g = goldenFor(fixture("page-ug-chords"));
+  assert.equal(g.kind, "chords");
+  assert.equal(g.title, "Covet");
+  assert.equal(g.artist, "Basement");
+  // 57 bars: the song. Reading the whole page gave 75, the extra 18 being the
+  // tuning header read as six chords, the five-chord diagram legend and the
+  // seven letters A-G of the A-Z artist index.
+  assert.equal(g.chords, 57);
+  assert.ok(g.tracks.chords > 0 && g.tracks.bass > 0);
+});
+
+test("a whole GuitarTuna chord page converts, capo and tempo included", () => {
+  const g = goldenFor(fixture("page-guitartuna"));
+  assert.equal(g.kind, "chords");
+  assert.equal(g.title, "Perfect");
+  assert.equal(g.artist, "Ed Sheeran");
+  assert.equal(g.tempo, 95); // the page says "BPM: 95"
+  assert.equal(g.chords, 36);
+  // "Capo: Fret 1" raises everything a semitone, so a written G sounds as Ab,
+  // which is the key the page itself states.
+  assert.equal(g.firstMidi % 12, 8);
+});

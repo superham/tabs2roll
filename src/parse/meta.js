@@ -35,7 +35,8 @@ export function findCapo(lines) {
   for (const line of lines) {
     if (/\bcapo\b/i.test(line)) {
       if (/\bcapo\s*[:=\-]?\s*(?:no|none|off|without|-|0)\b/i.test(line)) return 0;
-      const m = /\bcapo\s*[:=\-]?\s*(?:on\s*|at\s*)?(?:the\s*)?(\d{1,2})(?:st|nd|rd|th)?\b/i.exec(line);
+      // "Capo: 2", "Capo on the 3rd fret", "Capo: Fret 1" (GuitarTuna).
+      const m = /\bcapo\s*[:=\-]?\s*(?:on\s*|at\s*)?(?:the\s*)?(?:fret\s*)?(\d{1,2})(?:st|nd|rd|th)?\b/i.exec(line);
       if (m) {
         const n = parseInt(m[1], 10);
         if (inRange(n, 0, 12)) return n;
@@ -101,6 +102,18 @@ export function findTitleAndArtist(lines) {
   let title = "";
   let artist = "";
   const head = lines.slice(0, 40);
+
+  // "Covet Chords by Basement", "Perfect chords by Ed Sheeran",
+  // "GREENSLEEVES TAB by Traditional". Chord pages put this line near the top
+  // and it is far more reliable than guessing from the first short line,
+  // which on a real page is a navigation item ("Tabs", "Skip to content").
+  for (const line of head) {
+    const m = /^(.{1,80}?)\s+(?:easy\s+)?(?:guitar\s+|bass\s+|ukulele\s+)?(?:chords|chord chart|tabs?|tablature)\s+by\s+(.{1,60}?)\s*$/i.exec(line.trim());
+    if (m && !/^\s*(?:more|related|other)\b/i.test(m[1])) {
+      return { title: cleanupName(m[1]), artist: cleanupName(m[2]) };
+    }
+  }
+
   for (const line of head) {
     const t = line.trim();
     let m;

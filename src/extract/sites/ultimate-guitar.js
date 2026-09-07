@@ -3,7 +3,7 @@
 // RUNS INSIDE THE TAB PAGE. This file is concatenated into the generated
 // src/extract/injected.js by tools/build-injected.js, so it must have NO
 // imports and depend on nothing but its arguments: `doc` (the page's
-// document) and `shape` ({ looksLikeTab, tabLineCount, isTabShapedLine }).
+// document) and `shape` (the helpers from parse/tabshape.js).
 // It reads the DOM and returns plain data. It never modifies the page and
 // never talks to the network.
 //
@@ -78,7 +78,7 @@ export function extractUltimateGuitar(doc, shape) {
       return { ok: false, reason: "unsupported", site: "ultimate-guitar", type };
     }
     const content = meta && meta.wiki_tab && typeof meta.wiki_tab.content === "string" ? meta.wiki_tab.content : null;
-    if (content && (shape.looksLikeTab(content) || type.indexOf("chord") !== -1 || /\[ch\]/.test(content))) {
+    if (content && (shape.looksLikeSong(content) || type.indexOf("chord") !== -1 || /\[ch\]/.test(content))) {
       const result = { ...base, text: content, type: type || null, strategy: "store" };
       if (tabInfo) {
         if (tabInfo.song_name) result.title = String(tabInfo.song_name);

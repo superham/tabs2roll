@@ -5,8 +5,11 @@ standard MIDI file you can drag into your DAW.
 
 - One button: **Send to my DAW**. The file lands in your Downloads folder as
   `Artist - Song (tab).mid`.
-- Works on Ultimate Guitar and on any page that shows tab as text. If a page can't be
-  read, paste the tab text into the popup instead.
+- Works on Ultimate Guitar and on any page that shows tab or chords as text, including
+  modern chord pages that print the chord names above (or on their own line before) the
+  words. If a page can't be read, paste the text into the popup instead.
+- Reads the song out of the page and leaves the rest behind: navigation, the
+  chord-diagram legend, comments and the A-Z artist index never become bars of music.
 - Makes up to four tracks: the guitar exactly as tabbed, plus chords, bass and lead
   worked out from it.
 - Zero network requests, no accounts, no telemetry. It reads the page you clicked on and
@@ -47,6 +50,7 @@ prints a summary (title, tuning, tracks, timing step) and with `--notes` every n
 src/
   extract/      DOM  -> raw tab text        runs inside the page; site-specific
   parse/        text -> IR                  pure, no DOM, no browser APIs
+    region.js   whole page -> just the song (see below)
   arrange/      IR   -> IR + chord/bass/lead pure
   midi/         IR   -> Uint8Array          pure, hand-written SMF encoder
   pipeline.js   the three above in one call (used by the CLI and the extension)
@@ -103,6 +107,17 @@ extension's own `localStorage`, which needs no permission.
   patterns keep their rhythm.
 - **Timing**: the most common gap between notes in a tab is one step (an eighth note by
   default); bar lines snap to whole bars. Files always say the timing was guessed.
+- **Trimming the page down to the song** happens on TEXT, in `parse/region.js`, not in
+  the DOM extractor. That is deliberate: a real user faced with a page the extractor
+  cannot read will select the whole page and paste it, so the paste box needs exactly
+  the same clean-up as the button. Read as text, a page's chord-diagram legend
+  (`E / C#m / G#m / B / A`, one per line) and its A-Z artist index (`A / B / C / D / E /
+  F / G`) are indistinguishable from chord lines; both used to become bars of music.
+  The trimmer scores every line and keeps the best-scoring stretch, and it refuses to
+  cut when that would throw away most of the song.
+- **A capo transposes chord sheets too**, not just tabs. Chord sheets name the shape the
+  player holds, so a capo on fret 1 means a written G sounds as Ab, and the file should
+  match the record rather than the shapes.
 
 ## License
 

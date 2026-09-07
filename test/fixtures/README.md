@@ -11,6 +11,15 @@ Grace) plus deliberately awkward shapes (no labels, low string on top, staves st
 together, separators, Ultimate Guitar markup, techniques, seven strings, bass, capo,
 alternate tunings, a chord sheet with an intro riff, and a page of prose).
 
+The two `page-*.txt` files are different: they are whole web pages as a person would
+get them by selecting everything and copying, navigation and footer included. They
+exist to pin the behaviour of `src/parse/region.js`, which cuts a page down to the
+song. `page-ug-chords.txt` is an Ultimate Guitar chord sheet, chords aligned above the
+words, wrapped in a chord-diagram legend and an A-Z artist index that both read as
+chord lines. `page-guitartuna.txt` is the newer layout, one chord per line with the
+alignment gone, plus a capo and a stated tempo. Do not tidy them up: the mess is the
+test.
+
 ## Adding a real tab
 
 1. Save the text as `test/fixtures/<name>.txt`.

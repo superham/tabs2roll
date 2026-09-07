@@ -64,6 +64,37 @@ each string is given the pitch with that name nearest to standard tuning
 
 A capo raises every string by its fret number so the file sounds at real pitch.
 
+## Finding the song on a page (`src/parse/region.js`)
+
+Before anything is parsed, a whole web page is cut down to the song. This is not a
+musical decision so much as a survival one: read as plain text, the chord-diagram
+legend at the top of a page (`E / C#m / G#m / B / A`, one chord per line) and the A-Z
+artist index at the bottom (`A / B / C / D / E / F / G`) are perfect chord lines, and
+they used to become eighteen bars of nonsense wrapped around a real song.
+
+Every line is classified (`tab`, `section`, `chord`, `lyric`, `metadata`, `other`) and
+scored, and the highest-scoring contiguous stretch wins. The rule that does the real
+work: **a run of chord lines counts as music only when words, a section marker or a
+stave sit immediately before or after it.** A legend and an index have neither, and a
+run longer than `MAX_CHORD_RUN` (8) with no words inside it is a list, not a song.
+
+Two safety rails: nothing is cut when the best stretch scores zero or less, and nothing
+is cut when it would drop more than half the song's chord and tab lines.
+
+| What | Constant | Value |
+|---|---|---|
+| a stave line | `SCORES.tab` | +4 |
+| a section marker | `SCORES.section` | +4 |
+| a chord line beside words | `SCORES.chordSupported` | +3 |
+| a chord line with no words near it | `SCORES.chordAlone` | -3 |
+| words beside chords | `SCORES.lyricNearChords` | +2 |
+| prose with no chords near it | `SCORES.lyricAlone` | -1 |
+| `Tuning: ...`, `© 2026`, a URL | `SCORES.metadata` | -1 |
+| navigation, counts, stray words | `SCORES.other` | -2 |
+
+Song metadata is still read from the **whole** page, because `Tuning: Drop D`,
+`Capo: Fret 1`, `BPM: 95` and `Covet Chords by Basement` all live outside the song.
+
 ## Chord sheets (`src/parse/chords.js`)
 
 - One chord symbol = one bar (three beats in 3/4, four in 4/4), in reading order.
@@ -72,6 +103,33 @@ A capo raises every string by its fret number so the file sounds at real pitch.
   its bass note underneath.
 - Recognised: major, minor, dim, aug, sus2/sus4, 6, 7, maj7, m7, dim7, 9 (as a 7th plus
   the 9th), add9, add11, power chords (`A5`), slash bass.
+- **A capo raises every note by its fret number**, exactly as it does for tab. A chord
+  sheet names the *shape* the player holds, not the pitch that comes out: with a capo on
+  fret 1, a written G sounds as Ab. GuitarTuna's "Perfect" page states both
+  "Capo: Fret 1" and "Key: Ab major", which is the same thing said twice.
+- Chord sheets come in two layouts, and only one of them carries rhythm:
+
+  **Aligned** (Ultimate Guitar) puts the chords above the words, so the column spacing
+  says something about how long each chord lasts:
+
+  ```
+          E    C#m   G#m
+  When I'm with you,
+  ```
+
+  **Stacked** (GuitarTuna and most newer pages) gives every chord its own line, so the
+  alignment is gone entirely and only the order survives:
+
+  ```
+  G
+  Em
+  I found a love for me
+  ```
+
+  Today both get one bar per chord, which is right for the stacked layout and only
+  approximately right for the aligned one. Using column positions to proportion the bar
+  in the aligned case is the obvious next improvement; the layouts are told apart by
+  whether any line holds two or more chords.
 
 ## Arranging (`src/arrange/index.js`)
 

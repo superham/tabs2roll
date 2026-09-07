@@ -8,19 +8,25 @@
 
 import { splitLines } from "./text.js";
 import { noteNameToPitchClass } from "./tuning.js";
+import { CHORD_TOKEN_RE, CHORD_FILLER_RE, SECTION_RE, isChordOnlyLine, isSectionLine } from "./tabshape.js";
 
 /**
  * One chord symbol. Root, optional accidental, optional quality, optional
  * extension digits, optional sus/add tail, optional slash bass.
  *   C  Am  F#m7  Bb  Gsus4  Dmaj7  E7  Cadd9  D/F#  Bdim  Caug  A5
  */
-export const CHORD_RE = /^([A-G])(#|b)?(maj|min|dim|aug|sus|add|m|M|\+|°)?(\d+)?(sus\d?|add\d+)?(?:\/([A-G])(#|b)?)?$/;
+export const CHORD_RE = CHORD_TOKEN_RE;
 
-/** Tokens that may appear on a chord line without being chords. */
-const FILLER_RE = /^(\||\|\||-|–|—|\/|x\d+|\(x\d+\)|\d+x|N\.?C\.?|\(N\.?C\.?\)|\.|,)$/i;
+export { SECTION_RE };
 
-/** "[Verse 1]", "Chorus:", "Intro" — section markers we skip. */
-const SECTION_RE = /^\s*(\[[^\]]+\]|\(?(intro|verse|chorus|bridge|outro|pre-chorus|prechorus|solo|interlude|refrain|ending|coda|riff|instrumental|break|hook|tag)\b[^:\n]*:?\)?)\s*$/i;
+/**
+ * A section label used as a prefix: "Intro: C G Am F".
+ *
+ * Only these words are stripped. Stripping any "Word:" prefix, as an earlier
+ * version did, turned the header line "Tuning: E A D G B E" into six chords
+ * and put six bars of nonsense at the front of the file.
+ */
+const SECTION_PREFIX_RE = /^(?:intro|verse|chorus|bridge|outro|pre-?chorus|solo|interlude|refrain|ending|coda|riff|instrumental|break|hook|tag|part)\s*\d*\s*:\s*/i;
 
 // Interval recipes in semitones above the root.
 const QUALITY_INTERVALS = {
@@ -107,17 +113,15 @@ export function parseChordSymbol(token) {
  * Returns the chords on it, or null.
  */
 export function chordLine(line) {
-  let text = line.trim();
-  if (!text || SECTION_RE.test(text)) return null;
-  // "Intro: C G Am F"
-  text = text.replace(/^[A-Za-z][A-Za-z0-9 '-]{0,20}:\s*/, "");
-  const tokens = text.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return null;
+  let text = String(line || "").trim();
+  if (!text || isSectionLine(text)) return null;
+  text = text.replace(SECTION_PREFIX_RE, "").trim();
+  if (!isChordOnlyLine(text)) return null;
   const chords = [];
-  for (const tok of tokens) {
+  for (const tok of text.split(/\s+/).filter(Boolean)) {
     const chord = parseChordSymbol(tok);
     if (chord) chords.push(chord);
-    else if (!FILLER_RE.test(tok)) return null;
+    else if (!CHORD_FILLER_RE.test(tok)) return null;
   }
   return chords.length ? chords : null;
 }
@@ -165,12 +169,20 @@ export function voiceChord(chord) {
 
 /**
  * Parse a chord sheet into notes. Each chord lasts one bar.
+ *
+ * MUSICAL DECISION — capo: chord sheets name the SHAPE the player holds, not
+ * the pitch that comes out. With a capo on fret 1, written G sounds as Ab. So
+ * every note moves up by the capo fret, and the file matches the record
+ * rather than the shapes. (This is the same rule the tab parser applies to
+ * open strings.)
+ *
  * Returns { notes, chordCount, lineCount }.
  */
 export function parseChordSheet(text, options = {}) {
   const lines = splitLines(text);
   const timeSignature = options.timeSignature || [4, 4];
   const beatsPerBar = timeSignature[0] * (4 / timeSignature[1]);
+  const capo = Number.isFinite(options.capo) ? Math.max(0, options.capo) : 0;
   const notes = [];
   let bar = 0;
   let chordCount = 0;
@@ -182,7 +194,7 @@ export function parseChordSheet(text, options = {}) {
     for (const chord of chords) {
       const start = bar * beatsPerBar;
       for (const midi of voiceChord(chord)) {
-        notes.push({ midi, start, length: beatsPerBar, velocity: 0.75, technique: null, chord: chord.name });
+        notes.push({ midi: midi + capo, start, length: beatsPerBar, velocity: 0.75, technique: null, chord: chord.name });
       }
       bar++;
       chordCount++;

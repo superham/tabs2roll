@@ -1,15 +1,21 @@
 // Generic extractor: works on any page that shows tab as text.
 //
 // RUNS INSIDE THE TAB PAGE. Concatenated into src/extract/injected.js by
-// tools/build-injected.js — NO imports; depends only on `doc` and `shape`.
+// tools/build-injected.js — NO imports; depends only on `doc` and `shape`
+// (the helpers from parse/tabshape.js).
 // Reads the DOM, returns plain data, changes nothing, sends nothing.
 //
 // Strategies, first plausible result wins:
-//   2. <pre> elements whose text passes the tab-shape heuristic.
+//   2. <pre> elements whose text passes the shape heuristic.
 //   3. Any element whose text passes, deepest match wins (several deepest
 //      matches — one per stave — are joined in page order).
 //   4. document.body.innerText, if the page as a whole passes.
 // Strategy numbering continues from ultimate-guitar.js.
+//
+// "Passes" means looksLikeSong: ASCII tab OR a chord sheet. Chord pages have
+// no dashes anywhere, so demanding tab shape here used to make every one of
+// them read as "no tab on this page". Whatever comes back is cut down to the
+// song itself later, by parse/region.js.
 
 /** Elements whose text is never tab. */
 const SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, TEXTAREA: 1, IFRAME: 1, HEAD: 1 };
@@ -53,7 +59,7 @@ function fromPreElements(doc, shape) {
   const hits = [];
   for (let i = 0; i < pres.length; i++) {
     const text = textOf(pres[i]);
-    if (shape.looksLikeTab(text)) hits.push(text);
+    if (shape.looksLikeSong(text)) hits.push(text);
   }
   if (!hits.length) return null;
   return { text: hits.join("\n\n"), strategy: "pre" };
@@ -71,7 +77,7 @@ function fromDeepestElements(doc, shape) {
   const visit = (el, depth) => {
     if (!el || SKIP_TAGS[el.tagName] || depth > 60) return false;
     const text = textOf(el);
-    if (!shape.looksLikeTab(text)) return false;
+    if (!shape.looksLikeSong(text)) return false;
     let childMatched = false;
     const children = el.children || [];
     for (let i = 0; i < children.length; i++) {
@@ -89,7 +95,7 @@ function fromDeepestElements(doc, shape) {
 /** Strategy 4. */
 function fromBodyText(doc, shape) {
   const text = doc.body ? textOf(doc.body) : "";
-  if (!shape.looksLikeTab(text)) return null;
+  if (!shape.looksLikeSong(text)) return null;
   return { text, strategy: "body" };
 }
 

@@ -143,3 +143,36 @@ test("injected.js is up to date and runs as a plain script with no imports", () 
   assert.equal(result.text.trim(), TAB);
   assert.equal(result.title, "Song");
 });
+
+const CHORD_PAGE_LINES = ["Verse 1", "G", "Em", "I found a love for me", "C", "Darling, just dive right in", "D", "And follow my lead"];
+
+test("generic: a chord page is found even though it has no dashes anywhere", () => {
+  // The layout modern chord pages use: every chord in its own element, the
+  // words in theirs. Nothing here would ever pass the tab-shape heuristic.
+  const song = el("div", { class: "song" }, CHORD_PAGE_LINES.map((l) => el("div", {}, [l])));
+  const doc = document({
+    hostname: "guitartuna.com",
+    title: "Perfect chords by Ed Sheeran",
+    body: [el("nav", {}, [el("a", {}, ["Chords & Tabs"]), el("a", {}, ["Tools"])]), song, el("footer", {}, ["© Yousician Oy 2026"])],
+  });
+  const r = extractGeneric(doc, shape);
+  assert.equal(r.ok, true);
+  assert.equal(r.title, "Perfect chords by Ed Sheeran");
+  assert.ok(r.text.includes("I found a love for me"));
+  assert.ok(r.text.includes("Em"));
+});
+
+test("generic: a chord legend on its own is not a song", () => {
+  const legend = el("div", {}, ["Chords", "E", "C#m", "G#m", "B", "A"].map((l) => el("div", {}, [l])));
+  const doc = document({ title: "Some page", body: [legend] });
+  assert.equal(extractGeneric(doc, shape), null);
+});
+
+test("the injected script finds a chord page, not just tab", () => {
+  const built = buildInjected();
+  const song = el("div", {}, CHORD_PAGE_LINES.map((l) => el("div", {}, [l])));
+  const doc = document({ hostname: "example.com", title: "Perfect chords by Ed Sheeran", body: [song] });
+  const result = vm.runInNewContext(built, { document: doc });
+  assert.equal(result.ok, true);
+  assert.ok(result.text.includes("I found a love for me"));
+});

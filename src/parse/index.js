@@ -21,6 +21,7 @@
 // Pure ES module: no DOM, no browser APIs.
 
 import { splitLines } from "./text.js";
+import { trimToSong } from "./region.js";
 import { detect } from "./detect.js";
 import { findMeta } from "./meta.js";
 import { parseTab, STEP_BEATS, DEFAULT_STEP } from "./tab.js";
@@ -28,11 +29,16 @@ import { parseChordSheet } from "./chords.js";
 import { STANDARD_GUITAR, tuningById, parseTuningText } from "./tuning.js";
 
 export { detect } from "./detect.js";
+export { trimToSong, findSongRegion } from "./region.js";
 export { looksLikeTab, tabLineCount, isTabShapedLine } from "./tabshape.js";
 export { cleanText } from "./text.js";
 export { findMeta } from "./meta.js";
 export { STEP_BEATS, DEFAULT_STEP } from "./tab.js";
 export * as tuning from "./tuning.js";
+
+function cleanTextOf(text) {
+  return splitLines(text).join("\n");
+}
 
 export const DEFAULT_TEMPO = 120;
 export const IR_VERSION = 1;
@@ -64,11 +70,18 @@ export class ParseError extends Error {
  *   step       "1/4" | "1/8" | "1/16" timing step (default "1/8")
  *   capo       capo fret known from the page
  *   kind       force "tab" or "chords" instead of detecting
+ *   wholePage  true to keep the surrounding page instead of trimming to the
+ *              song (only useful for debugging what the trimmer did)
  */
 export function parseText(text, options = {}) {
+  // Header lines like "Tuning: Drop D" and "Covet Chords by Basement" live
+  // outside the song, so metadata is read from everything the page gave us...
   const lines = splitLines(text);
   const meta = findMeta(lines);
-  const detected = detect(text);
+  // ...while the notes come from the song alone, with the page's navigation,
+  // chord legend, comments and artist index cut away.
+  const song = options.wholePage ? cleanTextOf(text) : trimToSong(text);
+  const detected = detect(song);
   const kind = options.kind || detected.kind;
   if (kind === "none") throw new ParseError("no-tab", "No tab or chords found in text");
 
@@ -100,7 +113,7 @@ export function parseText(text, options = {}) {
   };
 
   if (kind === "chords") {
-    const parsed = parseChordSheet(text, { timeSignature });
+    const parsed = parseChordSheet(song, { timeSignature, capo });
     if (!parsed.notes.length) throw new ParseError("no-notes", "Chord sheet produced no notes");
     ir.tracks.push({ role: "guitar", notes: parsed.notes });
     ir.info.chords = parsed.chordCount;
@@ -109,7 +122,7 @@ export function parseText(text, options = {}) {
   }
 
   const hintTuning = typeof options.tuningText === "string" ? parseTuningText(options.tuningText) : null;
-  const parsed = parseTab(text, {
+  const parsed = parseTab(song, {
     step: options.step,
     tuning: override,
     headerTuning: meta.tuning || hintTuning,
