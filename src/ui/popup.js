@@ -13,6 +13,8 @@ const $ = (id) => document.getElementById(id);
 const VIEWS = ["view-checking", "view-found", "view-notfound", "view-error", "view-success"];
 const INJECTED_SCRIPT = "extract/injected.js";
 const RESULT_GLOBAL = "__tab2rollResult"; // must match tools/build-injected.js
+/** Only ordinary web pages can be read. Not about:, moz-extension:, view-source:. */
+const READABLE_URL = /^https?:\/\//i;
 
 const state = {
   tab: null, // { id, url } of the page the popup opened on
@@ -128,7 +130,10 @@ function buildTuningSelect() {
 
 async function activeTab() {
   try {
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    let tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    // A popup is not always counted as being in the current window; asking
+    // for the last focused one is the reliable follow-up.
+    if (!tabs || !tabs.length) tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     return tabs && tabs[0] ? { id: tabs[0].id, url: tabs[0].url || null } : null;
   } catch (err) {
     console.warn("[tab2roll] could not find the active tab", err);
@@ -145,16 +150,18 @@ function firstResult(results) {
   return null;
 }
 
-/** What the browser handed back, in a form worth printing to the console. */
+/**
+ * What the browser handed back, as a string. A string on purpose: the console
+ * collapses arrays inside logged objects, so an object here would be reported
+ * back as "entries: (1) [...]", which says nothing.
+ */
 function describeResults(results) {
-  if (!Array.isArray(results)) return { returned: typeof results };
-  return {
-    frames: results.length,
-    entries: results.map((entry) => ({
-      hasResult: !!(entry && entry.result),
-      error: entry && entry.error ? String(entry.error.message || entry.error) : null,
-    })),
-  };
+  if (!Array.isArray(results)) return `not an array (${typeof results})`;
+  const entries = results.map((entry) => {
+    const error = entry && entry.error ? String(entry.error.message || entry.error) : null;
+    return `{ hasResult: ${!!(entry && entry.result)}, error: ${error === null ? "none" : JSON.stringify(error)} }`;
+  });
+  return `frames: ${results.length}, ${entries.join(", ")}`;
 }
 
 /**
@@ -190,6 +197,14 @@ async function lookAtPage() {
   state.page = null;
   state.pageReason = "none";
   if (!state.tab || typeof state.tab.id !== "number") return;
+  console.log("[tab2roll] reading tab", state.tab.id, state.tab.url || "(url not visible)");
+  // Extension pages, about: pages and the like cannot be read, and Firefox
+  // blocks the attempt rather than failing outright. Saying so plainly beats
+  // reporting that a page has no tab on it.
+  if (state.tab.url && !READABLE_URL.test(state.tab.url)) {
+    console.warn("[tab2roll] this is not a web page I can read:", state.tab.url);
+    return;
+  }
   let result = null;
   try {
     result = await runExtractor(state.tab.id);

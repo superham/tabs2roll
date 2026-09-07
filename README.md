@@ -88,7 +88,8 @@ and how many lines of it read as tab, chords or words. Open it from
 `about:debugging#/runtime/this-firefox` with **Inspect** next to tab2roll.
 
 ```
-[tab2roll] ran the extractor: { frames: 1, entries: [ { hasResult: true, error: null } ] }
+[tab2roll] reading tab 7 https://tabs.ultimate-guitar.com/tab/...
+[tab2roll] ran the extractor: frames: 1, { hasResult: true, error: none }
 [tab2roll] page: { ok: true, site: "ultimate-guitar", strategy: "pre",
                    build: "45a1e21d", chars: 8213, chordLines: 42 }
 [tab2roll] read as: chords { staves: 0, chords: 57, ... }
@@ -98,10 +99,17 @@ and how many lines of it read as tab, chords or words. Open it from
 and the popup footer shows the installed version. If either does not match,
 the browser is running an older copy: reload the add-on.
 
-`hasResult: false` on the first line means the browser ran the script but did
-not hand its value back. Firefox does this for file injections, so the answer
-is fetched with a second, function-based injection instead; the next console
-line reports whether that worked.
+The first line names the tab being read. If it is not the tab page you are
+looking at, that is the whole problem: the popup reads whichever tab is
+active, so an extension page or a newly opened tab in front of it will be
+read instead. Extension and `about:` pages are skipped without injecting,
+because Firefox blocks content scripts there and reports it as an entry
+carrying an error rather than as a failure.
+
+`hasResult: false` means the browser ran the script but did not hand its
+value back. Firefox does this for file injections, so the answer is fetched
+with a second, function-based injection instead; the next console line
+reports whether that worked.
 
 To check a page without the extension at all, paste the contents of
 [tools/page-check.js](tools/page-check.js) into the console of the tab page

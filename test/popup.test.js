@@ -57,7 +57,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
-      getManifest: () => ({ version: "0.1.4" }),
+      getManifest: () => ({ version: "0.1.5" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -123,7 +123,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
     // The installed version is shown so a stale add-on is obvious at a glance.
-    assert.equal(await text(page, "#version"), "Version 0.1.4");
+    assert.equal(await text(page, "#version"), "Version 0.1.5");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");
@@ -209,6 +209,20 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await visible(page, ".tuning-row"), false);
     const sent = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "sendMessage")[1];
     assert.equal(sent.meta.source, "paste");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("an extension page is not read at all, and never reported as a page with no tab on it", async () => {
+    // What actually went wrong on a real machine: the onboarding page opened
+    // on every reload of the temporary add-on and took the active tab, so the
+    // popup aimed at moz-extension://.../onboarding.html. Firefox blocks
+    // injection there and returns an entry carrying an error rather than
+    // throwing, which read as "no tab on this page".
+    const { page, errors } = await open({ url: "moz-extension://abc/ui/onboarding.html", extract: { ok: true, site: "generic", text: TAB, title: "X", artist: "" }, reply: null });
+    assert.equal(await visible(page, "#view-notfound"), true);
+    assert.equal(await visible(page, "#paste-body"), true);
+    const injections = await page.evaluate(() => window.__calls.filter((c) => c[0] === "executeScript"));
+    assert.deepEqual(injections, [], "must not try to inject into an extension page");
     assert.deepEqual(errors, []);
   });
 

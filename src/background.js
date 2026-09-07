@@ -18,13 +18,35 @@
 const browser = globalThis.browser ?? globalThis.chrome;
 
 const ONBOARDING_PAGE = "ui/onboarding.html";
+const ONBOARDING_SHOWN = "tab2roll:onboardingShown";
 const DOWNLOAD_TIMEOUT_MS = 30000;
 
 browser.runtime.onInstalled.addListener((details) => {
-  if (details && details.reason === "install") {
-    browser.tabs.create({ url: browser.runtime.getURL(ONBOARDING_PAGE) }).catch((err) => console.error("[tab2roll] could not open onboarding page", err));
-  }
+  if (!details || details.reason !== "install") return;
+  // A temporary add-on loaded from about:debugging reports "install" every
+  // time it is reloaded. Opening the onboarding page each time would put a
+  // new tab in front of whatever the developer was looking at, and the popup
+  // would then be aimed at that tab instead of the tab page.
+  if (onboardingAlreadyShown()) return;
+  rememberOnboardingShown();
+  browser.tabs.create({ url: browser.runtime.getURL(ONBOARDING_PAGE) }).catch((err) => console.error("[tab2roll] could not open onboarding page", err));
 });
+
+function onboardingAlreadyShown() {
+  try {
+    return localStorage.getItem(ONBOARDING_SHOWN) === "1";
+  } catch (err) {
+    return false;
+  }
+}
+
+function rememberOnboardingShown() {
+  try {
+    localStorage.setItem(ONBOARDING_SHOWN, "1");
+  } catch (err) {
+    console.warn("[tab2roll] could not remember that onboarding was shown", err);
+  }
+}
 
 browser.runtime.onMessage.addListener((message, sender) => {
   if (!message || typeof message !== "object") return undefined;
