@@ -11,7 +11,16 @@ import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
 const P = STRINGS.popup;
 const $ = (id) => document.getElementById(id);
 const VIEWS = ["view-checking", "view-found", "view-notfound", "view-error", "view-success"];
-const INJECTED_SCRIPT = "extract/injected.js";
+/**
+ * Path to the injected script, ABSOLUTE from the extension root.
+ *
+ * The leading slash matters. Without it Firefox resolves the path against the
+ * document doing the injecting — the popup, which lives in ui/ — and asks for
+ * ui/extract/injected.js, which does not exist. It then reports the failure
+ * as an entry carrying an error rather than by throwing, so the extractor
+ * silently never ran at all.
+ */
+const INJECTED_SCRIPT = "/extract/injected.js";
 const RESULT_GLOBAL = "__tab2rollResult"; // must match tools/build-injected.js
 /** Only ordinary web pages can be read. Not about:, moz-extension:, view-source:. */
 const READABLE_URL = /^https?:\/\//i;

@@ -3,7 +3,7 @@
 // literals of its own for the user.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { STRINGS, str } from "../src/strings.js";
 
@@ -81,4 +81,17 @@ test("the popup shows the version, and manifest and package agree on it", () => 
   assert.equal(STRINGS.popup.version(manifest.version), `Version ${manifest.version}`);
   const html = readFileSync(new URL("../src/ui/popup.html", import.meta.url), "utf8");
   assert.match(html, /id="version"/);
+});
+
+test("the injected script is referenced by an absolute path that exists", () => {
+  const popup = readFileSync(new URL("../src/ui/popup.js", import.meta.url), "utf8");
+  const match = /const INJECTED_SCRIPT = "([^"]+)"/.exec(popup);
+  assert.ok(match, "popup.js should name the injected script");
+  const path = match[1];
+  // Without the leading slash Firefox resolves the path against the popup's
+  // own directory and asks for ui/extract/injected.js, which does not exist.
+  // It reports that as an entry carrying an error rather than by throwing, so
+  // the extractor silently never runs and every page reads as empty.
+  assert.ok(path.startsWith("/"), `injected script path must be absolute, got "${path}"`);
+  assert.ok(existsSync(new URL("../src" + path, import.meta.url)), `no such file: src${path}`);
 });

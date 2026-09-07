@@ -57,7 +57,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
-      getManifest: () => ({ version: "0.1.5" }),
+      getManifest: () => ({ version: "0.1.6" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -123,7 +123,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
     // The installed version is shown so a stale add-on is obvious at a glance.
-    assert.equal(await text(page, "#version"), "Version 0.1.5");
+    assert.equal(await text(page, "#version"), "Version 0.1.6");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");
@@ -143,7 +143,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(sent.meta.title, "Greensleeves");
     assert.equal(sent.options.step, "1/8");
     assert.equal(sent.options.arrange, true);
-    assert.equal(calls.find((c) => c[0] === "executeScript")[1].files[0], "extract/injected.js");
+    assert.equal(calls.find((c) => c[0] === "executeScript")[1].files[0], "/extract/injected.js");
 
     // The confirmation is remembered for the next time the popup opens.
     const stored = await page.evaluate(() => localStorage.getItem("tab2roll:lastResult"));
@@ -181,7 +181,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#song-title"), "Covet — Basement");
     const calls = await page.evaluate(() => window.__calls.filter((c) => c[0] === "executeScript").map((c) => c[1]));
     assert.equal(calls.length, 2, "should fall back to a second injection");
-    assert.deepEqual(calls[0].files, ["extract/injected.js"]);
+    assert.deepEqual(calls[0].files, ["/extract/injected.js"]);
     assert.equal(calls[1].func, true);
     assert.deepEqual(errors, []);
   });
