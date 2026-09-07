@@ -1,0 +1,33 @@
+{
+  "kind": "tab",
+  "title": "Ode to Joy - Beethoven",
+  "artist": "",
+  "tempo": 100,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 2,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 16,
+  "noteCount": 30,
+  "firstMidi": 64,
+  "lastMidi": 60,
+  "firstStart": 0,
+  "lastStart": 15,
+  "techniques": {},
+  "tracks": {
+    "guitar": 30,
+    "lead": 30
+  }
+}

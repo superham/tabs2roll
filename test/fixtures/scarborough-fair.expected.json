@@ -1,0 +1,34 @@
+{
+  "kind": "tab",
+  "title": "Scarborough Fair",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    3,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 2,
+  "chords": 0,
+  "unit": 6,
+  "totalBeats": 12,
+  "noteCount": 24,
+  "firstMidi": 57,
+  "lastMidi": 50,
+  "firstStart": 0,
+  "lastStart": 10,
+  "techniques": {},
+  "tracks": {
+    "guitar": 24,
+    "chords": 6,
+    "bass": 11
+  }
+}

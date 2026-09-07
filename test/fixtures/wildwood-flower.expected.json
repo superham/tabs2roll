@@ -1,0 +1,34 @@
+{
+  "kind": "tab",
+  "title": "Wildwood Flower (Carter style)",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 12,
+  "noteCount": 30,
+  "firstMidi": 48,
+  "lastMidi": 43,
+  "firstStart": 0,
+  "lastStart": 8,
+  "techniques": {},
+  "tracks": {
+    "guitar": 30,
+    "chords": 24,
+    "bass": 8
+  }
+}

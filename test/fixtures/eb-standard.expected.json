@@ -1,0 +1,32 @@
+{
+  "kind": "tab",
+  "title": "Eb test",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    39,
+    44,
+    49,
+    54,
+    58,
+    63
+  ],
+  "tuningId": "eb-standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 4,
+  "noteCount": 4,
+  "firstMidi": 63,
+  "lastMidi": 49,
+  "firstStart": 0,
+  "lastStart": 1.5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 4
+  }
+}

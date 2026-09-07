@@ -1,0 +1,18 @@
+Chord sheet with a short intro riff
+
+[Intro]
+e|--0--3--0--|
+B|-----------|
+G|-----------|
+D|-----------|
+A|-----------|
+E|-----------|
+
+[Verse]
+C        G        Am       F
+Some words go here on this line
+C        G        F        C
+More words go here on this line
+[Chorus]
+F        G        C        Am
+Chorus words go here on this line

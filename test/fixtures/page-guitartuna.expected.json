@@ -1,0 +1,34 @@
+{
+  "kind": "chords",
+  "title": "Perfect",
+  "artist": "Ed Sheeran",
+  "tempo": 95,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": null,
+  "staves": 0,
+  "chords": 36,
+  "unit": null,
+  "totalBeats": 144,
+  "noteCount": 144,
+  "firstMidi": 44,
+  "lastMidi": 56,
+  "firstStart": 0,
+  "lastStart": 140,
+  "techniques": {},
+  "tracks": {
+    "guitar": 144,
+    "chords": 108,
+    "bass": 36
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "tab",
+  "title": "Sparse, no bar lines, wide spacing",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 5,
+  "totalBeats": 8,
+  "noteCount": 10,
+  "firstMidi": 64,
+  "lastMidi": 62,
+  "firstStart": 0,
+  "lastStart": 4.5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 10,
+    "lead": 10
+  }
+}

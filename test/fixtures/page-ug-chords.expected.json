@@ -1,0 +1,34 @@
+{
+  "kind": "chords",
+  "title": "Covet",
+  "artist": "Basement",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": null,
+  "staves": 0,
+  "chords": 57,
+  "unit": null,
+  "totalBeats": 228,
+  "noteCount": 228,
+  "firstMidi": 52,
+  "lastMidi": 59,
+  "firstStart": 0,
+  "lastStart": 224,
+  "techniques": {},
+  "tracks": {
+    "guitar": 228,
+    "chords": 171,
+    "bass": 57
+  }
+}

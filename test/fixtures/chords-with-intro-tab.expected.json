@@ -1,0 +1,34 @@
+{
+  "kind": "chords",
+  "title": "Chord sheet with a short intro riff",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": null,
+  "staves": 0,
+  "chords": 12,
+  "unit": null,
+  "totalBeats": 48,
+  "noteCount": 48,
+  "firstMidi": 48,
+  "lastMidi": 57,
+  "firstStart": 0,
+  "lastStart": 44,
+  "techniques": {},
+  "tracks": {
+    "guitar": 48,
+    "chords": 36,
+    "bass": 12
+  }
+}
