@@ -25,7 +25,7 @@ import { detect } from "./detect.js";
 import { findMeta } from "./meta.js";
 import { parseTab, STEP_BEATS, DEFAULT_STEP } from "./tab.js";
 import { parseChordSheet } from "./chords.js";
-import { STANDARD_GUITAR, tuningById } from "./tuning.js";
+import { STANDARD_GUITAR, tuningById, parseTuningText } from "./tuning.js";
 
 export { detect } from "./detect.js";
 export { looksLikeTab, tabLineCount, isTabShapedLine } from "./tabshape.js";
@@ -59,6 +59,8 @@ export class ParseError extends Error {
  *   tempo      known from the page (overrides the text)
  *   tuningId   force a named tuning (the "Wrong tuning? Re-do as:" dropdown)
  *   tuning     force explicit open-string notes low-to-high
+ *   tuningText a tuning the page mentioned ("Drop D", "E A D G B E"); used
+ *              only when the tab text itself says nothing about tuning
  *   step       "1/4" | "1/8" | "1/16" timing step (default "1/8")
  *   capo       capo fret known from the page
  *   kind       force "tab" or "chords" instead of detecting
@@ -106,10 +108,11 @@ export function parseText(text, options = {}) {
     return ir;
   }
 
+  const hintTuning = typeof options.tuningText === "string" ? parseTuningText(options.tuningText) : null;
   const parsed = parseTab(text, {
     step: options.step,
     tuning: override,
-    headerTuning: meta.tuning,
+    headerTuning: meta.tuning || hintTuning,
     capo,
     timeSignature,
   });

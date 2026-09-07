@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title data-str="appName">tab2roll</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img src="../icons/icon.svg" alt="" width="20" height="20" />
+      <span data-str="appName"></span>
+    </header>
+
+    <main id="main">
+      <!-- Looking for tab on the page -->
+      <section id="view-checking" class="view" hidden>
+        <p class="muted" data-str="popup.checking"></p>
+      </section>
+
+      <!-- Tab found: title above the button so the user can confirm it -->
+      <section id="view-found" class="view" hidden>
+        <p class="found-label" id="found-label"></p>
+        <p class="song-title" id="song-title"></p>
+      </section>
+
+      <!-- Nothing readable on this page -->
+      <section id="view-notfound" class="view" hidden>
+        <p class="message" id="notfound-message"></p>
+      </section>
+
+      <!-- Something went wrong: plain words + what to do -->
+      <section id="view-error" class="view" hidden>
+        <p class="message error" id="error-message"></p>
+      </section>
+
+      <!-- Saved -->
+      <section id="view-success" class="view" hidden>
+        <p class="muted small" id="recent-heading" data-str="popup.recentHeading" hidden></p>
+        <p class="saved"><span class="check" aria-hidden="true">✓</span> <span id="saved-filename"></span></p>
+        <p data-str="popup.inDownloads"></p>
+        <p class="next"><strong data-str="popup.nextTitle"></strong> <span data-str="popup.nextSteps"></span></p>
+        <p class="small" id="chords-note" hidden></p>
+        <p class="small" id="rhythm-note"></p>
+        <p class="small muted" id="tracks-note"></p>
+        <p><a href="#" id="show-me-how" data-str="popup.showMeHow"></a></p>
+        <div class="tuning-row">
+          <label for="tuning-select" data-str="popup.wrongTuning"></label>
+          <select id="tuning-select"></select>
+        </div>
+        <p class="muted small" id="redo-status" hidden data-str="popup.redoing"></p>
+        <button id="convert-another" class="secondary" type="button" data-str="popup.convertAnother"></button>
+      </section>
+
+      <!-- The one primary control -->
+      <div id="main-action" hidden>
+        <button id="main-button" class="primary" type="button">
+          <span class="label" data-str="popup.mainButton"></span>
+          <small id="main-subtext" data-str="popup.mainSubtext"></small>
+        </button>
+      </div>
+
+      <!-- Manual paste: the universal escape hatch -->
+      <section id="paste">
+        <button id="paste-toggle" class="link" type="button" aria-expanded="false" aria-controls="paste-body" data-str="popup.pasteLabel"></button>
+        <div id="paste-body" hidden>
+          <textarea id="paste-text" rows="7" spellcheck="false" data-str="popup.pastePlaceholder" data-str-attr="placeholder"></textarea>
+          <p class="small" id="paste-status"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bottom">
+      <a href="#" id="link-help" data-str="popup.help"></a>
+      <span aria-hidden="true">·</span>
+      <a href="#" id="link-settings" data-str="popup.settings"></a>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

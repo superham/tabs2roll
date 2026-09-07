@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-str="help.title">tab2roll help</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <div class="page" id="top">
+      <header class="brand">
+        <img src="../icons/icon.svg" alt="" />
+        <h1 data-str="help.title"></h1>
+      </header>
+      <p class="lead" data-str="help.intro"></p>
+      <nav class="toc">
+        <a href="#fl-studio" data-str="help.flHeading"></a>
+        <a href="#where" data-str="help.whereHeading"></a>
+        <a href="#timing" data-str="help.timingHeading"></a>
+        <a href="#tuning" data-str="help.tuningHeading"></a>
+        <a href="#not-found" data-str="help.notFoundHeading"></a>
+        <a href="#paste" data-str="help.pasteHeading"></a>
+      </nav>
+
+      <h2 id="fl-studio" data-str="help.flHeading"></h2>
+      <div class="big-step"><span class="num">1</span><p data-str="help.fl1"></p></div>
+      <div class="big-step"><span class="num">2</span><p data-str="help.fl2"></p></div>
+      <div class="big-step"><span class="num">3</span><p data-str="help.fl3"></p></div>
+      <div class="big-step"><span class="num">4</span><p data-str="help.fl4"></p></div>
+      <div class="big-step"><span class="num">5</span><p data-str="help.fl5"></p></div>
+      <figure>
+        <!-- Illustration: Downloads folder window on the left, FL Studio
+             playlist on the right, a file being dragged across.
+             TODO: replace with a real screenshot (docs/screenshots/drag.png). -->
+        <svg viewBox="0 0 640 300" role="img" aria-labelledby="drag-title">
+          <title id="drag-title">Dragging the MIDI file from the Downloads folder onto the FL Studio playlist</title>
+          <rect x="0" y="0" width="640" height="300" fill="#f3f4f6" />
+          <!-- file window -->
+          <rect x="16" y="24" width="270" height="250" rx="10" fill="#ffffff" stroke="#d1d5db" />
+          <rect x="16" y="24" width="270" height="34" rx="10" fill="#e5e7eb" />
+          <text x="32" y="46" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#111827">Downloads</text>
+          <g font-family="system-ui, sans-serif" font-size="13" fill="#374151">
+            <text x="32" y="86">photo.jpg</text>
+            <text x="32" y="112">setup.exe</text>
+          </g>
+          <rect x="24" y="124" width="254" height="26" rx="6" fill="#fde68a" />
+          <text x="32" y="142" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#78350f">Artist - Song (tab).mid</text>
+          <!-- DAW window -->
+          <rect x="330" y="24" width="294" height="250" rx="10" fill="#1f2937" stroke="#111827" />
+          <rect x="330" y="24" width="294" height="34" rx="10" fill="#111827" />
+          <text x="346" y="46" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#f9fafb">Playlist</text>
+          <g stroke="#374151" stroke-width="1">
+            <line x1="330" y1="96" x2="624" y2="96" />
+            <line x1="330" y1="136" x2="624" y2="136" />
+            <line x1="330" y1="176" x2="624" y2="176" />
+            <line x1="330" y1="216" x2="624" y2="216" />
+          </g>
+          <rect x="410" y="104" width="120" height="24" rx="4" fill="#f59e0b" opacity="0.9" />
+          <text x="418" y="121" font-family="system-ui, sans-serif" font-size="12" fill="#111827">Guitar (as tabbed)</text>
+          <rect x="410" y="144" width="120" height="24" rx="4" fill="#60a5fa" opacity="0.9" />
+          <text x="418" y="161" font-family="system-ui, sans-serif" font-size="12" fill="#111827">Chords</text>
+          <rect x="410" y="184" width="120" height="24" rx="4" fill="#34d399" opacity="0.9" />
+          <text x="418" y="201" font-family="system-ui, sans-serif" font-size="12" fill="#111827">Bass</text>
+          <!-- drag arrow -->
+          <path d="M282 137 C 320 137, 340 116, 404 116" stroke="#b45309" stroke-width="3" fill="none" marker-end="url(#arrow2)" />
+          <defs>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#b45309" />
+            </marker>
+          </defs>
+        </svg>
+        <figcaption data-str="help.flCaption"></figcaption>
+      </figure>
+
+      <h2 data-str="help.otherDawHeading"></h2>
+      <p data-str="help.otherDaw"></p>
+
+      <h2 id="where" data-str="help.whereHeading"></h2>
+      <p data-str="help.where"></p>
+
+      <h2 id="tracks" data-str="help.tracksHeading"></h2>
+      <p data-str="help.tracksIntro"></p>
+      <ul>
+        <li data-str="help.tracksGuitar"></li>
+        <li data-str="help.tracksChords"></li>
+        <li data-str="help.tracksBass"></li>
+        <li data-str="help.tracksLead"></li>
+      </ul>
+      <p data-str="help.tracksEmpty"></p>
+
+      <h2 id="timing" data-str="help.timingHeading"></h2>
+      <p data-str="help.timing1"></p>
+      <p data-str="help.timing2"></p>
+      <p data-str="help.timing3"></p>
+
+      <h2 id="tuning" data-str="help.tuningHeading"></h2>
+      <p data-str="help.tuning1"></p>
+      <p data-str="help.tuning2"></p>
+
+      <h2 id="not-found" data-str="help.notFoundHeading"></h2>
+      <p data-str="help.notFound1"></p>
+      <p data-str="help.notFound2"></p>
+      <p data-str="help.notFound3"></p>
+
+      <h2 id="paste" data-str="help.pasteHeading"></h2>
+      <p data-str="help.paste1"></p>
+      <p data-str="help.paste2"></p>
+
+      <h2 id="privacy" data-str="help.privacyHeading"></h2>
+      <p data-str="help.privacy"></p>
+
+      <p class="top-link"><a href="#top" data-str="help.backToTop"></a></p>
+    </div>
+    <script type="module" src="page.js"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-str="options.title">tab2roll settings</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="brand">
+        <img src="../icons/icon.svg" alt="" />
+        <h1 data-str="options.title"></h1>
+      </header>
+      <p class="lead" data-str="options.intro"></p>
+
+      <h2 data-str="options.stepHeading"></h2>
+      <label for="step" data-str="options.stepLabel"></label>
+      <select id="step">
+        <option value="1/8" data-str="options.stepEighth"></option>
+        <option value="1/4" data-str="options.stepQuarter"></option>
+        <option value="1/16" data-str="options.stepSixteenth"></option>
+      </select>
+      <p class="hint" data-str="options.stepHint"></p>
+
+      <h2 data-str="options.tracksHeading"></h2>
+      <label><input type="checkbox" id="arrange" /> <span data-str="options.arrangeLabel"></span></label>
+      <p class="hint" data-str="options.arrangeHint"></p>
+
+      <p class="status" id="status"></p>
+      <p><button type="button" id="reset" data-str="options.resetButton"></button></p>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

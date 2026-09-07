@@ -1,0 +1,303 @@
+// The toolbar popup: the only entry point of the extension.
+//
+// States: checking -> found | not found -> (click) -> success | failure.
+// Every user-facing string comes from src/strings.js. Real errors go to the
+// console; the user only ever sees plain language plus what to do next.
+
+import { fillStrings, browser, getOptions, getLastResult, setLastResult, openPage, STRINGS } from "./common.js";
+import { detect } from "../parse/index.js";
+import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
+
+const P = STRINGS.popup;
+const $ = (id) => document.getElementById(id);
+const VIEWS = ["view-checking", "view-found", "view-notfound", "view-error", "view-success"];
+const INJECTED_SCRIPT = "extract/injected.js";
+
+const state = {
+  tab: null, // { id, url } of the page the popup opened on
+  page: null, // extraction result with kind, or null
+  pageReason: "none", // why the page gave nothing: "none" | "unsupported" | "error"
+  pasteKind: "none", // detect() of the paste box
+  busy: false,
+  lastConversion: null, // { text, meta, options } for "Wrong tuning? Re-do as:"
+};
+
+// --------------------------------------------------------------------------
+// Rendering
+// --------------------------------------------------------------------------
+
+function show(viewId) {
+  for (const id of VIEWS) $(id).hidden = id !== viewId;
+}
+
+function setMainVisible(visible) {
+  $("main-action").hidden = !visible;
+}
+
+function setPasteOpen(open) {
+  $("paste-body").hidden = !open;
+  $("paste-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function hasPaste() {
+  return state.pasteKind !== "none";
+}
+
+function updateMainSubtext() {
+  const el = $("main-subtext");
+  if (state.busy) el.textContent = P.working;
+  else el.textContent = hasPaste() ? P.mainSubtextPaste : P.mainSubtext;
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  $("main-button").disabled = busy;
+  $("tuning-select").disabled = busy;
+  updateMainSubtext();
+}
+
+function displayTitle(page) {
+  const title = (page.title || "").trim();
+  const artist = (page.artist || "").trim();
+  if (title && artist) return `${title} — ${artist}`;
+  return title || artist || P.foundUntitled;
+}
+
+function renderPageState() {
+  if (state.page) {
+    show("view-found");
+    $("found-label").textContent = state.page.kind === "chords" ? P.foundChords : P.foundTab;
+    $("song-title").textContent = displayTitle(state.page);
+    setMainVisible(true);
+  } else {
+    show("view-notfound");
+    $("notfound-message").textContent = state.pageReason === "unsupported" ? P.unsupported : P.notFound;
+    setMainVisible(hasPaste()); // never a dead button: it appears once there is something to send
+    setPasteOpen(true);
+  }
+  updateMainSubtext();
+}
+
+function renderError(code) {
+  const messages = {
+    "no-tab": P.noNotes,
+    "no-notes": P.noNotes,
+    unsupported: P.unsupported,
+    "download-failed": P.downloadFailed,
+  };
+  show("view-error");
+  $("error-message").textContent = messages[code] || P.unknownError;
+  setPasteOpen(true);
+  setMainVisible(hasPaste() || (code === "download-failed" && !!state.page));
+  updateMainSubtext();
+}
+
+function renderSuccess(result, { recent = false } = {}) {
+  show("view-success");
+  $("recent-heading").hidden = !recent;
+  $("saved-filename").textContent = P.savedAs(result.filename);
+  $("chords-note").hidden = result.kind !== "chords";
+  $("chords-note").textContent = P.chordSheet;
+  $("rhythm-note").textContent = result.rhythmSource === "exact" ? P.rhythmExact : P.rhythmGuessed;
+  $("tracks-note").textContent = Array.isArray(result.tracks) && result.tracks.length ? P.tracksMade(result.tracks.join(", ")) : "";
+  const tuningRow = document.querySelector(".tuning-row");
+  tuningRow.hidden = result.kind !== "tab";
+  $("tuning-select").value = result.tuningId && SELECTABLE_TUNING_IDS.includes(result.tuningId) ? result.tuningId : "custom";
+  $("redo-status").hidden = true;
+  setMainVisible(false);
+  setPasteOpen(false);
+}
+
+function buildTuningSelect() {
+  const select = $("tuning-select");
+  select.textContent = "";
+  for (const id of [...SELECTABLE_TUNING_IDS, "custom"]) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = STRINGS.tunings[id];
+    if (id === "custom") option.disabled = true;
+    select.appendChild(option);
+  }
+}
+
+// --------------------------------------------------------------------------
+// Reading the page
+// --------------------------------------------------------------------------
+
+async function activeTab() {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    return tabs && tabs[0] ? { id: tabs[0].id, url: tabs[0].url || null } : null;
+  } catch (err) {
+    console.warn("[tab2roll] could not find the active tab", err);
+    return null;
+  }
+}
+
+/** Run the injected extractor on the page (activeTab grants access on click). */
+async function lookAtPage() {
+  state.page = null;
+  state.pageReason = "none";
+  if (!state.tab || typeof state.tab.id !== "number") return;
+  let result = null;
+  try {
+    const results = await browser.scripting.executeScript({ target: { tabId: state.tab.id }, files: [INJECTED_SCRIPT] });
+    result = results && results[0] ? results[0].result : null;
+  } catch (err) {
+    // Pages Firefox will not let extensions read (about:, the add-ons site,
+    // PDF viewer) land here. That is a "not found", not an error.
+    console.warn("[tab2roll] could not read this page:", err && err.message ? err.message : err);
+    return;
+  }
+  if (result && result.ok && typeof result.text === "string") {
+    const kind = detect(result.text).kind;
+    if (kind !== "none") {
+      state.page = { ...result, kind };
+      return;
+    }
+    state.pageReason = "none";
+    return;
+  }
+  if (result && result.reason) {
+    state.pageReason = result.reason === "unsupported" ? "unsupported" : "none";
+    if (result.reason === "error") console.error("[tab2roll] extractor failed inside the page:", result.message);
+  }
+}
+
+// --------------------------------------------------------------------------
+// Converting
+// --------------------------------------------------------------------------
+
+function currentOptions() {
+  const options = getOptions();
+  return { step: options.step, arrange: options.arrange !== false };
+}
+
+async function convert({ text, meta, options }) {
+  setBusy(true);
+  try {
+    const reply = await browser.runtime.sendMessage({ type: "tab2roll:convert", text, meta, options });
+    if (reply && reply.ok) {
+      state.lastConversion = { text, meta, options };
+      const result = {
+        filename: reply.filename,
+        kind: reply.kind,
+        rhythmSource: reply.rhythmSource,
+        tuningId: reply.tuningId,
+        tracks: reply.tracks,
+        title: reply.title,
+        pageUrl: meta.source === "paste" ? null : state.tab && state.tab.url,
+      };
+      setLastResult({ ...result, conversion: state.lastConversion });
+      renderSuccess(result);
+    } else {
+      renderError(reply && reply.code);
+    }
+  } catch (err) {
+    console.error("[tab2roll] could not reach the background page", err);
+    renderError("unknown");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function onMainClick() {
+  if (state.busy) return;
+  const usePaste = hasPaste();
+  if (!usePaste && !state.page) return;
+  const text = usePaste ? $("paste-text").value : state.page.text;
+  const meta = usePaste
+    ? { source: "paste" }
+    : {
+        source: state.page.site || "generic",
+        title: state.page.title || "",
+        artist: state.page.artist || "",
+        tuning: typeof state.page.tuning === "string" ? state.page.tuning : "",
+        capo: typeof state.page.capo === "number" ? state.page.capo : undefined,
+      };
+  await convert({ text, meta, options: currentOptions() });
+}
+
+async function onTuningChange() {
+  const id = $("tuning-select").value;
+  if (state.busy || !state.lastConversion || id === "custom") return;
+  const { text, meta, options } = state.lastConversion;
+  const label = (STRINGS.tunings[id] || id).replace(/\s*\(.*\)$/, "");
+  $("redo-status").hidden = false;
+  await convert({ text, meta, options: { ...options, tuningId: id, filenameSuffix: label } });
+}
+
+function onPasteInput() {
+  const text = $("paste-text").value;
+  const kind = text.trim() ? detect(text).kind : "none";
+  state.pasteKind = kind;
+  const status = $("paste-status");
+  if (!text.trim()) status.textContent = "";
+  else if (kind === "tab") status.textContent = P.pasteLooksLikeTab;
+  else if (kind === "chords") status.textContent = P.pasteLooksLikeChords;
+  else status.textContent = P.pasteNotYet;
+  if (!$("view-success").hidden) {
+    // Typing into the box after a save means "do another one".
+    renderPageState();
+  }
+  if (!state.page) setMainVisible(kind !== "none");
+  updateMainSubtext();
+}
+
+function onConvertAnother() {
+  setLastResult(null);
+  renderPageState();
+}
+
+// --------------------------------------------------------------------------
+// Wiring
+// --------------------------------------------------------------------------
+
+function wireEvents() {
+  $("main-button").addEventListener("click", onMainClick);
+  $("tuning-select").addEventListener("change", onTuningChange);
+  $("convert-another").addEventListener("click", onConvertAnother);
+  $("paste-toggle").addEventListener("click", () => setPasteOpen($("paste-body").hidden));
+  $("paste-text").addEventListener("input", onPasteInput);
+  $("show-me-how").addEventListener("click", (e) => {
+    e.preventDefault();
+    openPage("ui/help.html#fl-studio");
+  });
+  $("link-help").addEventListener("click", (e) => {
+    e.preventDefault();
+    openPage("ui/help.html");
+  });
+  $("link-settings").addEventListener("click", (e) => {
+    e.preventDefault();
+    Promise.resolve(browser.runtime.openOptionsPage ? browser.runtime.openOptionsPage() : openPage("ui/options.html")).catch(() => openPage("ui/options.html"));
+  });
+}
+
+async function init() {
+  fillStrings();
+  buildTuningSelect();
+  wireEvents();
+  show("view-checking");
+  setMainVisible(false);
+
+  state.tab = await activeTab();
+
+  // A popup closes the moment it loses focus, so a confirmation can vanish
+  // before it is read. Show the last one again if it was a few minutes ago
+  // and we are still on the same page (or it came from pasted text).
+  const recent = getLastResult();
+  if (recent && recent.filename && (!recent.pageUrl || (state.tab && recent.pageUrl === state.tab.url))) {
+    state.lastConversion = recent.conversion || null;
+    renderSuccess(recent, { recent: true });
+    lookAtPage().catch((err) => console.warn("[tab2roll]", err));
+    return;
+  }
+
+  await lookAtPage();
+  renderPageState();
+}
+
+init().catch((err) => {
+  console.error("[tab2roll] popup failed to start", err);
+  renderError("unknown");
+});
