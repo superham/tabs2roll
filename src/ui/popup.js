@@ -4,7 +4,7 @@
 // Every user-facing string comes from src/strings.js. Real errors go to the
 // console; the user only ever sees plain language plus what to do next.
 
-import { fillStrings, browser, getOptions, getLastResult, setLastResult, openPage, STRINGS } from "./common.js";
+import { fillStrings, browser, getOptions, getLastResult, setLastResult, openPage, getVersion, STRINGS } from "./common.js";
 import { detect } from "../parse/index.js";
 import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
 
@@ -262,6 +262,11 @@ function onConvertAnother() {
 // Wiring
 // --------------------------------------------------------------------------
 
+function showVersion() {
+  const version = getVersion();
+  $("version").textContent = version ? P.version(version) : "";
+}
+
 function wireEvents() {
   $("main-button").addEventListener("click", onMainClick);
   $("tuning-select").addEventListener("change", onTuningChange);
@@ -284,6 +289,7 @@ function wireEvents() {
 
 async function init() {
   fillStrings();
+  showVersion();
   buildTuningSelect();
   wireEvents();
   show("view-checking");

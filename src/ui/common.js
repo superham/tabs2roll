@@ -70,6 +70,21 @@ export function setLastResult(result) {
   return writeStore("lastResult", result ? { ...result, at: Date.now() } : null);
 }
 
+/**
+ * The installed version, straight from the manifest, so what the popup shows
+ * can never drift from what is actually running. Useful when checking that a
+ * reload of the add-on took effect.
+ */
+export function getVersion() {
+  try {
+    const manifest = browser.runtime.getManifest();
+    return manifest && manifest.version ? String(manifest.version) : "";
+  } catch (err) {
+    console.warn("[tab2roll] could not read the version", err);
+    return "";
+  }
+}
+
 /** Open one of the bundled pages in a new tab. */
 export async function openPage(path) {
   try {

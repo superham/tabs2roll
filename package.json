@@ -1,6 +1,6 @@
 {
   "name": "tab2roll",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Firefox extension that turns the guitar tab on the current page into a MIDI file for your DAW.",
   "private": true,
   "type": "module",

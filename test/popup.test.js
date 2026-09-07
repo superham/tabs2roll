@@ -57,6 +57,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
+      getManifest: () => ({ version: "0.1.3" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -115,6 +116,8 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await visible(page, "#main-action"), true);
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
+    // The installed version is shown so a stale add-on is obvious at a glance.
+    assert.equal(await text(page, "#version"), "Version 0.1.3");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");

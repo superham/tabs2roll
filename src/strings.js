@@ -51,6 +51,7 @@ export const STRINGS = {
 
     help: "Help",
     settings: "Settings",
+    version: (number) => `Version ${number}`,
   },
 
   tunings: {

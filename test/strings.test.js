@@ -69,3 +69,16 @@ test("UI code has no user-facing string literals (only strings.js does)", () => 
     assert.deepEqual(suspicious, [], `${file} has user-facing literals`);
   }
 });
+
+test("the popup shows the version, and manifest and package agree on it", () => {
+  const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
+  const manifest = read("../src/manifest.json");
+  const pkg = read("../package.json");
+  assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(manifest.version, pkg.version, "src/manifest.json and package.json disagree on the version");
+  // The popup reads the number from the manifest at run time; only its
+  // wording lives in strings.js.
+  assert.equal(STRINGS.popup.version(manifest.version), `Version ${manifest.version}`);
+  const html = readFileSync(new URL("../src/ui/popup.html", import.meta.url), "utf8");
+  assert.match(html, /id="version"/);
+});
