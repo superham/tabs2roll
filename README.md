@@ -1,7 +1,7 @@
 # tab2roll
 
 A Firefox extension that turns the guitar tab on the page you are looking at into a
-standard MIDI file you can drag into your DAW.
+standard MIDI file you can open in your DAW.
 
 - One button: **Send to my DAW**. The file lands in your Downloads folder as
   `Artist - Song (tab).mid`.
@@ -116,6 +116,38 @@ To check a page without the extension at all, paste the contents of
 itself. It reports the same numbers plus the first 40 lines as the page reads
 them, which is the quickest way to tell "the page is unreadable" from "the
 extension is stale".
+
+### When FL Studio ignores the file
+
+A dropped file that FL Studio refuses looks exactly like a broken file: nothing appears,
+and no message is shown. It is worth checking the file itself before believing that,
+because the answer is usually the drop and not the bytes:
+
+```sh
+node tools/check-midi.js out.mid            # or: npm run check-midi -- <file>
+```
+
+It re-reads the bytes strictly and without any of the encoder's assumptions — every chunk
+length has to be consumed exactly, every track has to end with an end-of-track event, no
+note may be left switched on — and prints the tracks, notes and channels it found. A file
+that passes is one every DAW can open, and the report says so in as many words, because
+the point of running it is to stop suspecting the file.
+
+FL Studio then turns a dropped file down silently in three known cases, none of which
+have anything to do with the file:
+
+- It is running as an administrator on Windows. Windows will not let an ordinary file
+  window hand files to an elevated program, so the drop never reaches FL Studio
+  ([Image-Line knowledge base](https://support.image-line.com/action/knowledgebase/?ans=571)).
+- It is the Fruity Edition, which does not accept files dropped on the playlist at all.
+- The file's full name and folder run past about 256 characters
+  ([Image-Line forum](https://forum.image-line.com/viewtopic.php?t=196376)).
+
+`File > Import > MIDI file` works in every edition and is unaffected by all three, so
+that is the route the popup and the help page lead with; dragging is offered as the
+shortcut it is. The help page's "Nothing happens when I drag the file in" section
+(`ui/help.html#drag-does-nothing`, linked straight from the confirmation in the popup)
+says the same thing to users.
 
 ### Permissions
 

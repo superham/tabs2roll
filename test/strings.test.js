@@ -38,11 +38,27 @@ test("the required failure and success messages exist word for word", () => {
   assert.equal(P.chordSheet, "This is a chord sheet, so I made the chords and a bassline.");
   assert.equal(P.unsupported, "This tab is in a format I can't read yet. Try one of the text tabs for this song.");
   assert.equal(P.noNotes, "I found the tab but couldn't make sense of it. Try pasting the tab text in below and I'll have another go.");
-  assert.equal(P.nextSteps, "Open FL Studio, then drag this file from your Downloads folder onto the playlist.");
+  // Dragging is the shortcut, not the instruction: FL Studio refuses dropped
+  // files silently when it runs as an administrator, in the Fruity Edition,
+  // or when the name is very long. The menu route works in every edition.
+  assert.match(P.nextSteps, /File \u2192 Import \u2192 MIDI file/);
+  assert.match(P.nextSteps, /playlist/);
   assert.equal(P.rhythmGuessed, "The timing is a best guess — you may need to nudge some notes.");
   assert.equal(P.wrongTuning, "Wrong tuning? Re-do as:");
   assert.equal(P.showMeHow, "Show me how");
   assert.ok(!/inferred|confidence/i.test(P.rhythmGuessed + P.rhythmExact));
+});
+
+test("the help page answers a drag that does nothing", () => {
+  const H = STRINGS.help;
+  // The one thing a user cannot see for themselves: FL Studio saying no is
+  // indistinguishable from a broken file, so the help has to say so outright.
+  assert.match(H.drag1, /file itself is fine/i);
+  for (const key of ["drag2", "drag3", "drag4"]) assert.ok(H[key] && H[key].length > 40, `help.${key} should explain one cause`);
+  assert.match(H.drag2, /administrator/i);
+  assert.match(H.drag3, /Fruity/i);
+  assert.match(H.drag5, /File \u2192 Import \u2192 MIDI file/);
+  assert.match(STRINGS.popup.dragDidNothing, /nothing happened/i);
 });
 
 test("str() resolves dotted keys and returns empty for unknown ones", () => {

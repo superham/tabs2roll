@@ -63,6 +63,11 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+h3 {
+  font-size: 16px;
+  margin: 24px 0 6px;
+}
+
 p,
 li {
   max-width: 62ch;
