@@ -1,0 +1,31 @@
+{
+  "kind": "tab",
+  "title": "Twelve bar blues in E (bass)",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    28,
+    33,
+    38,
+    43
+  ],
+  "tuningId": "bass",
+  "staves": 2,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 24,
+  "noteCount": 30,
+  "firstMidi": 28,
+  "lastMidi": 33,
+  "firstStart": 0,
+  "lastStart": 22,
+  "techniques": {},
+  "tracks": {
+    "guitar": 30,
+    "lead": 30
+  }
+}

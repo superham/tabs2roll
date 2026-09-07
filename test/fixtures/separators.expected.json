@@ -1,0 +1,33 @@
+{
+  "kind": "tab",
+  "title": "Separator test",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 8,
+  "noteCount": 8,
+  "firstMidi": 64,
+  "lastMidi": 66,
+  "firstStart": 0,
+  "lastStart": 5.5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 8,
+    "lead": 8
+  }
+}

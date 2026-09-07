@@ -1,0 +1,35 @@
+{
+  "kind": "tab",
+  "title": "Power chords and a lead run (for the arranger)",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 8,
+  "noteCount": 23,
+  "firstMidi": 57,
+  "lastMidi": 45,
+  "firstStart": 0,
+  "lastStart": 6,
+  "techniques": {},
+  "tracks": {
+    "guitar": 23,
+    "chords": 17,
+    "bass": 7,
+    "lead": 6
+  }
+}

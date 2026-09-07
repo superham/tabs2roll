@@ -1,0 +1,34 @@
+{
+  "kind": "tab",
+  "title": "Open G test",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    38,
+    43,
+    50,
+    55,
+    59,
+    62
+  ],
+  "tuningId": "open-g",
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 4,
+  "noteCount": 12,
+  "firstMidi": 62,
+  "lastMidi": 38,
+  "firstStart": 0,
+  "lastStart": 0.5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 12,
+    "chords": 6,
+    "bass": 2
+  }
+}

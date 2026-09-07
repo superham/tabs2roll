@@ -1,0 +1,35 @@
+{
+  "kind": "tab",
+  "title": "House of the Rising Sun",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    6,
+    8
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 2,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 24,
+  "noteCount": 48,
+  "firstMidi": 45,
+  "lastMidi": 64,
+  "firstStart": 0,
+  "lastStart": 23,
+  "techniques": {},
+  "tracks": {
+    "guitar": 48,
+    "chords": 4,
+    "bass": 2,
+    "lead": 36
+  }
+}

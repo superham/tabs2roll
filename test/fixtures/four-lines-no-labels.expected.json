@@ -1,0 +1,30 @@
+{
+  "kind": "tab",
+  "title": "Four unlabelled lines: treated as a bass tab",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    28,
+    33,
+    38,
+    43
+  ],
+  "tuningId": null,
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 4,
+  "noteCount": 4,
+  "firstMidi": 28,
+  "lastMidi": 38,
+  "firstStart": 0,
+  "lastStart": 2,
+  "techniques": {},
+  "tracks": {
+    "guitar": 4
+  }
+}

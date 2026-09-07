@@ -1,0 +1,33 @@
+{
+  "kind": "tab",
+  "title": "Two staves with no blank line between them",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 2,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 8,
+  "noteCount": 6,
+  "firstMidi": 57,
+  "lastMidi": 59,
+  "firstStart": 0,
+  "lastStart": 5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 6,
+    "lead": 6
+  }
+}

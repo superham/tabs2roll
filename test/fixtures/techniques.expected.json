@@ -1,0 +1,43 @@
+{
+  "kind": "tab",
+  "title": "Techniques test",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 8,
+  "noteCount": 15,
+  "firstMidi": 60,
+  "lastMidi": 45,
+  "firstStart": 0.5,
+  "lastStart": 7.5,
+  "techniques": {
+    "hammer": 1,
+    "pull": 1,
+    "ghost": 1,
+    "slide": 2,
+    "bend": 1,
+    "bend-target": 1,
+    "release": 1,
+    "mute": 1
+  },
+  "tracks": {
+    "guitar": 15,
+    "bass": 1,
+    "lead": 12
+  }
+}

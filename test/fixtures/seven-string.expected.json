@@ -1,0 +1,35 @@
+{
+  "kind": "tab",
+  "title": "Seven string test",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    35,
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": null,
+  "staves": 1,
+  "chords": 0,
+  "unit": 3,
+  "totalBeats": 4,
+  "noteCount": 8,
+  "firstMidi": 40,
+  "lastMidi": 38,
+  "firstStart": 0,
+  "lastStart": 1.5,
+  "techniques": {},
+  "tracks": {
+    "guitar": 8,
+    "chords": 8,
+    "bass": 4
+  }
+}
