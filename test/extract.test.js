@@ -6,7 +6,7 @@ import { el, document } from "./helpers/fake-dom.js";
 import * as shape from "../src/parse/tabshape.js";
 import { extractUltimateGuitar, parseUltimateGuitarTitle, findInJson, isUltimateGuitarHost } from "../src/extract/sites/ultimate-guitar.js";
 import { extractGeneric, cleanPageTitle, isPlayerOnlyHost } from "../src/extract/sites/generic.js";
-import { extractFromPage } from "../src/extract/sites/page.js";
+import { extractFromPage, describePage } from "../src/extract/sites/page.js";
 import { buildInjected, OUTPUT } from "../tools/build-injected.js";
 
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
@@ -122,7 +122,12 @@ test("ultimate-guitar: helpers", () => {
 });
 
 test("extractFromPage: nothing found, and errors inside the page never throw", () => {
-  assert.deepEqual(extractFromPage(document({ body: [] }), shape, sites), { ok: false, reason: "none" });
+  const empty = extractFromPage(document({ body: [] }), shape, sites);
+  assert.equal(empty.ok, false);
+  assert.equal(empty.reason, "none");
+  // Every result carries a note of what the page looked like, for the console.
+  assert.equal(typeof empty.seen, "object");
+  assert.equal(empty.seen.chordLines, 0);
   const broken = { location: { hostname: "example.com" }, get title() { throw new Error("boom"); } };
   const r = extractFromPage(broken, shape, sites);
   assert.equal(r.ok, false);
@@ -175,4 +180,29 @@ test("the injected script finds a chord page, not just tab", () => {
   const result = vm.runInNewContext(built, { document: doc });
   assert.equal(result.ok, true);
   assert.ok(result.text.includes("I found a love for me"));
+});
+
+test("describePage reports what the extractor saw, for the console", () => {
+  const song = el("div", {}, CHORD_PAGE_LINES.map((l) => el("div", {}, [l])));
+  const doc = document({ hostname: "example.com", title: "Perfect chords by Ed Sheeran", body: [song] });
+  const seen = describePage(doc, shape);
+  assert.equal(seen.build, "dev"); // "dev" under Node; a hash in the built script
+  assert.ok(seen.chars > 0);
+  assert.equal(seen.chordLines, 4); // G, Em, C, D
+  assert.equal(seen.looksLikeChords, true);
+  assert.equal(seen.looksLikeTab, false);
+
+  const tabDoc = document({ title: "T", body: [el("pre", {}, [TAB])] });
+  const tabSeen = describePage(tabDoc, shape);
+  assert.equal(tabSeen.looksLikeTab, true);
+  assert.equal(tabSeen.pres, 1);
+});
+
+test("a successful extraction reports the running build", () => {
+  const doc = document({ title: "Song - Site", body: [el("pre", {}, [TAB])] });
+  const built = buildInjected();
+  const result = vm.runInNewContext(built, { document: doc });
+  assert.equal(result.ok, true);
+  assert.match(result.seen.build, /^[0-9a-f]{8}$/);
+
 });

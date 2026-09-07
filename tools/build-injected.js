@@ -15,12 +15,18 @@
 // fails when it is out of date.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SOURCES = ["src/parse/tabshape.js", "src/extract/sites/ultimate-guitar.js", "src/extract/sites/generic.js", "src/extract/sites/page.js"];
 export const OUTPUT = "src/extract/injected.js";
+
+/** Short content hash, so a running browser can report which build it has. */
+export function buildStamp(parts) {
+  return createHash("sha256").update(parts.join("")).digest("hex").slice(0, 8);
+}
 
 export function buildInjected() {
   const parts = SOURCES.map((rel) => {
@@ -30,15 +36,18 @@ export function buildInjected() {
     if (/^\s*export\s/m.test(stripped)) throw new Error(`${rel}: only "export function/const/let/class" declarations are supported`);
     return `// ---- ${rel} ----\n${stripped.trim()}\n`;
   });
+  const stamp = buildStamp(parts);
   return [
     "/* GENERATED FILE — do not edit by hand. Rebuild with: npm run build",
     ` * Built from: ${SOURCES.join(", ")}`,
+    ` * Build: ${stamp}`,
     " *",
     " * This is the only code tab2roll ever runs inside a web page. It is injected",
     " * on toolbar click (activeTab), reads the page's DOM, returns plain data, and",
     " * touches nothing else: no UI, no styles, no storage, no network. */",
     "(() => {",
     '"use strict";',
+    `const EXTRACTOR_BUILD = ${JSON.stringify(stamp)};`,
     "",
     ...parts,
     "// ---- run ----",

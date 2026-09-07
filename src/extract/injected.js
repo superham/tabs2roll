@@ -1,11 +1,13 @@
 /* GENERATED FILE — do not edit by hand. Rebuild with: npm run build
  * Built from: src/parse/tabshape.js, src/extract/sites/ultimate-guitar.js, src/extract/sites/generic.js, src/extract/sites/page.js
+ * Build: ff4241c7
  *
  * This is the only code tab2roll ever runs inside a web page. It is injected
  * on toolbar click (activeTab), reads the page's DOM, returns plain data, and
  * touches nothing else: no UI, no styles, no storage, no network. */
 (() => {
 "use strict";
+const EXTRACTOR_BUILD = "ff4241c7";
 
 // ---- src/parse/tabshape.js ----
 // Shape heuristics — the shared, tested functions that decide whether a blob
@@ -407,6 +409,37 @@ function extractGeneric(doc, shape) {
 //   { ok: true,  site, text, title, artist, tuning?, capo?, type?, strategy }
 //   { ok: false, reason: "unsupported" | "none" | "error", site?, type?, message? }
 
+/**
+ * A short account of what the page looked like to the extractor. Printed to
+ * the console on every click, so a failure on a real site can be diagnosed
+ * without guessing: it says which build is running, how much text was on the
+ * page, and how many lines of it read as tab, chords or words.
+ */
+function describePage(doc, shape) {
+  const seen = { build: typeof EXTRACTOR_BUILD === "string" ? EXTRACTOR_BUILD : "dev" }; // eslint-disable-line no-undef
+  try {
+    const body = doc.body ? (typeof doc.body.innerText === "string" ? doc.body.innerText : doc.body.textContent) || "" : "";
+    const lines = body.split(/\r\n|\r|\n/);
+    seen.chars = body.length;
+    seen.lines = lines.length;
+    seen.tabLines = 0;
+    seen.chordLines = 0;
+    seen.lyricLines = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (shape.isTabShapedLine && shape.isTabShapedLine(lines[i])) seen.tabLines++;
+      if (shape.isChordOnlyLine && shape.isChordOnlyLine(lines[i])) seen.chordLines++;
+      if (shape.isLyricLine && shape.isLyricLine(lines[i])) seen.lyricLines++;
+    }
+    seen.looksLikeTab = !!(shape.looksLikeTab && shape.looksLikeTab(body));
+    seen.looksLikeChords = !!(shape.looksLikeChordSheet && shape.looksLikeChordSheet(body));
+    seen.pres = doc.querySelectorAll ? doc.querySelectorAll("pre").length : 0;
+    seen.stores = doc.querySelectorAll ? doc.querySelectorAll("[data-content]").length : 0;
+  } catch (err) {
+    seen.error = String((err && err.message) || err);
+  }
+  return seen;
+}
+
 function extractFromPage(doc, shape, sites) {
   const ug = sites && sites.ultimateGuitar ? sites.ultimateGuitar : typeof extractUltimateGuitar === "function" ? extractUltimateGuitar : null; // eslint-disable-line no-undef
   const generic = sites && sites.generic ? sites.generic : typeof extractGeneric === "function" ? extractGeneric : null; // eslint-disable-line no-undef
@@ -414,7 +447,7 @@ function extractFromPage(doc, shape, sites) {
     let hint = null;
     if (ug) {
       const r = ug(doc, shape);
-      if (r && r.ok) return r;
+      if (r && r.ok) return { ...r, seen: describePage(doc, shape) };
       if (r && r.reason === "unsupported") return r;
       if (r && r.reason === "fallthrough") hint = r;
     }
@@ -426,13 +459,13 @@ function extractFromPage(doc, shape, sites) {
           if (hint.artist) r.artist = hint.artist;
           r.site = hint.site || r.site;
         }
-        return r;
+        return { ...r, seen: describePage(doc, shape) };
       }
-      if (r && r.reason === "unsupported") return r;
+      if (r && r.reason === "unsupported") return { ...r, seen: describePage(doc, shape) };
     }
-    return { ok: false, reason: "none" };
+    return { ok: false, reason: "none", seen: describePage(doc, shape) };
   } catch (err) {
-    return { ok: false, reason: "error", message: String((err && err.message) || err) };
+    return { ok: false, reason: "error", message: String((err && err.message) || err), seen: describePage(doc, shape) };
   }
 }
 

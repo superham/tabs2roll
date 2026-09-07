@@ -80,6 +80,27 @@ function. It reads the DOM and returns plain data; it injects no UI, keeps no st
 never touches the network. The generated file is committed so a checkout loads without
 a build; `npm test` fails if it is stale.
 
+### When a real page does not work
+
+Every click logs one line to the extension's console saying what the page
+looked like: which extractor build is running, how much text was on the page,
+and how many lines of it read as tab, chords or words. Open it from
+`about:debugging#/runtime/this-firefox` with **Inspect** next to tab2roll.
+
+```
+[tab2roll] page: { ok: false, reason: "none", build: "ff4241c7", chars: 8213,
+                   chordLines: 0, tabLines: 0, looksLikeChords: false, pre: 0 }
+```
+
+`build` is a hash of the injected sources, printed by `npm run build`. If it
+does not match, the browser is running an older copy: reload the add-on.
+
+To check a page without the extension at all, paste the contents of
+[tools/page-check.js](tools/page-check.js) into the console of the tab page
+itself. It reports the same numbers plus the first 40 lines as the page reads
+them, which is the quickest way to tell "the page is unreadable" from "the
+extension is stale".
+
 ### Permissions
 
 `downloads`, `activeTab`, `scripting`. No host permissions: the install prompt does not

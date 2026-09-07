@@ -16,6 +16,7 @@ const INJECTED_SCRIPT = "extract/injected.js";
 const state = {
   tab: null, // { id, url } of the page the popup opened on
   page: null, // extraction result with kind, or null
+  pageText: null, // text the page gave us that did not read as a song
   pageReason: "none", // why the page gave nothing: "none" | "unsupported" | "error"
   pasteKind: "none", // detect() of the paste box
   busy: false,
@@ -149,12 +150,20 @@ async function lookAtPage() {
     console.warn("[tab2roll] could not read this page:", err && err.message ? err.message : err);
     return;
   }
+  // One console line per click saying exactly what the page looked like, so a
+  // failure on a real site does not have to be guessed at.
+  console.log("[tab2roll] page:", result ? { ok: result.ok, reason: result.reason, site: result.site, strategy: result.strategy, chars: result.text ? result.text.length : 0, ...(result.seen || {}) } : "no result from the page");
+
   if (result && result.ok && typeof result.text === "string") {
-    const kind = detect(result.text).kind;
-    if (kind !== "none") {
-      state.page = { ...result, kind };
+    const found = detect(result.text);
+    console.log("[tab2roll] read as:", found.kind, found);
+    if (found.kind !== "none") {
+      state.page = { ...result, kind: found.kind };
       return;
     }
+    // Text came back but nothing in it reads as a song. Say so plainly, and
+    // keep the text so the paste box can be primed with it.
+    state.pageText = result.text;
     state.pageReason = "none";
     return;
   }
