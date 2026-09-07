@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { STRINGS } from "../src/strings.js";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
@@ -57,7 +58,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
-      getManifest: () => ({ version: "0.1.6" }),
+      getManifest: () => ({ version: "0.1.7" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -123,13 +124,14 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
     // The installed version is shown so a stale add-on is obvious at a glance.
-    assert.equal(await text(page, "#version"), "Version 0.1.6");
+    assert.equal(await text(page, "#version"), "Version 0.1.7");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");
     assert.equal(await text(page, "#saved-filename"), "Saved Trad. - Greensleeves (tab).mid");
     assert.ok((await text(page, "#view-success")).includes("It's in your Downloads folder."));
-    assert.ok((await text(page, "#view-success")).includes("Open FL Studio, then drag this file from your Downloads folder onto the playlist."));
+    assert.ok((await text(page, "#view-success")).includes(STRINGS.popup.nextSteps));
+    assert.ok((await text(page, "#view-success")).includes(STRINGS.popup.dragDidNothing));
     assert.equal(await text(page, "#rhythm-note"), "The timing is a best guess — you may need to nudge some notes.");
     assert.equal(await visible(page, "#chords-note"), false);
     assert.equal(await visible(page, "#main-action"), false);
@@ -158,10 +160,11 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
 
     // Show me how / help / settings open bundled pages, never external URLs.
     await page.click("#show-me-how");
+    await page.click("#drag-trouble");
     await page.click("#link-help");
     await page.click("#link-settings");
     const after = await page.evaluate(() => window.__calls);
-    assert.deepEqual(after.filter((c) => c[0] === "tabs.create").map((c) => c[1]), ["/ui/help.html#fl-studio", "/ui/help.html"]);
+    assert.deepEqual(after.filter((c) => c[0] === "tabs.create").map((c) => c[1]), ["/ui/help.html#fl-studio", "/ui/help.html#drag-does-nothing", "/ui/help.html"]);
     assert.ok(after.some((c) => c[0] === "openOptionsPage"));
     assert.deepEqual(errors, []);
   });

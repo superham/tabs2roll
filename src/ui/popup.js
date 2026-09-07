@@ -350,6 +350,13 @@ function wireEvents() {
     e.preventDefault();
     openPage("ui/help.html#fl-studio");
   });
+  // A dropped file FL Studio refuses is silent: no message, no icon, nothing
+  // moves. The user has no way to tell that from a broken file, so the way
+  // out has to be offered right where the file was just saved.
+  $("drag-trouble").addEventListener("click", (e) => {
+    e.preventDefault();
+    openPage("ui/help.html#drag-does-nothing");
+  });
   $("link-help").addEventListener("click", (e) => {
     e.preventDefault();
     openPage("ui/help.html");
