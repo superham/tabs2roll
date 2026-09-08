@@ -146,6 +146,41 @@ A canvas holds the bars that are on screen and no more, so one click reads one s
 a four-minute song. The popup says how much of the score that was and offers to join the
 next screenful onto it.
 
+#### Getting at the pixels
+
+A canvas does not always hand its pixels over, and a tab player is exactly the kind of page
+that will not. A canvas drawn through WebGL has no 2d context to read. One whose control
+has been passed to a worker (`transferControlToOffscreen`) has no pixels in the page at
+all. One holding another site's images may not be read. All three throw or answer null, and
+all three used to look identical to "this page has no music on it".
+
+So there are two routes to the same pixels, tried in that order:
+
+1. **The canvas itself**, via `getImageData`. Exactly what was drawn, at whatever
+   resolution the page drew it. Nothing is better when it works.
+2. **A photograph of the window**, via `tabs.captureVisibleTab`, cropped to where the
+   canvas is on the screen. This holds whatever the person is looking at, however the page
+   drew it — WebGL, a worker, or an `<img>` the page swapped in — because it is a picture
+   of the screen rather than a copy of a buffer.
+
+`score-canvas.js` decides which: every canvas it passes over is recorded with a reason
+(`no-2d-context`, `transferred`, `blocked`, `blank`, `tiny`…), and the ones whose pixels
+are out of reach but which are still on the screen come back as `shots` — a rectangle in
+CSS pixels, plus the size of the window they were measured in. The popup takes one
+photograph, cuts each rectangle out of it and reads it with the same `src/read/` pipeline.
+
+The photograph arrives at the screen's own resolution, which is twice the page's own
+measurements on an ordinary laptop, so the scale is worked out from the picture that
+arrived (`cropBox` in `src/ui/picture.js`) rather than from `devicePixelRatio`. It is a
+PNG, not a JPEG: a JPEG's smudges around a small `7` are exactly what turns it into a `1`.
+No permission is added for any of this — `activeTab`, granted by the click that opens the
+popup, is what `captureVisibleTab` needs, and the photograph is cropped, read and dropped
+without being stored or sent anywhere.
+
+The reasons are not only for the code. They go to the console on every click as
+`seen.canvasSkipped`, because "there is a score here I am not allowed to read" and "there
+is no score here" want opposite answers from whoever is looking into it.
+
 ### When a real page does not work
 
 Every click logs one line to the extension's console saying what the page
@@ -176,6 +211,22 @@ carrying an error rather than as a failure.
 value back. Firefox does this for file injections, so the answer is fetched
 with a second, function-based injection instead; the next console line
 reports whether that worked.
+
+On a page that draws its tab, `canvases` is how many canvases gave up their
+pixels and `canvasSkipped` says what happened to the rest:
+
+```
+[tab2roll] page: { ok: false, reason: "unsupported", type: "official",
+                   canvases: 0, canvasSkipped: "1486x1870 blank, 1486x1870 no-2d-context" }
+[tab2roll] read a photograph of the window: { ok: true, staves: 6, notes: 42 }
+```
+
+`canvases: 0` with nothing in `canvasSkipped` means the page really has no
+canvas on it — a different page, or one that has not finished loading.
+`canvases: 0` with `no-2d-context`, `transferred` or `blocked` means the
+music is there but the buffer is shut, and the next line says how the
+photograph of it went. `blank` on its own is usually a player that has not
+painted yet: give the page a moment and click again.
 
 To check a page without the extension at all, paste the contents of
 [tools/page-check.js](tools/page-check.js) into the console of the tab page

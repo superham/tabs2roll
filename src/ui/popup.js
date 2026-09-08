@@ -7,7 +7,7 @@
 import { fillStrings, browser, getOptions, getLastResult, setLastResult, getPictureRead, setPictureRead, openPage, getVersion, STRINGS } from "./common.js";
 import { detect } from "../parse/index.js";
 import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
-import { imageDataFromFile, imageFileOf, readBestPicture, coverageOf } from "./picture.js";
+import { imageDataFromFile, imageDataFromShot, imageFileOf, readBestPicture, bestReading, coverageOf } from "./picture.js";
 
 const P = STRINGS.popup;
 const $ = (id) => document.getElementById(id);
@@ -179,7 +179,9 @@ async function activeTab() {
     // A popup is not always counted as being in the current window; asking
     // for the last focused one is the reliable follow-up.
     if (!tabs || !tabs.length) tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
-    return tabs && tabs[0] ? { id: tabs[0].id, url: tabs[0].url || null } : null;
+    // windowId comes along because tabs.captureVisibleTab wants one, and
+    // "the current window" is ambiguous from a popup in a way an id is not.
+    return tabs && tabs[0] ? { id: tabs[0].id, url: tabs[0].url || null, windowId: tabs[0].windowId } : null;
   } catch (err) {
     console.warn("[tab2roll] could not find the active tab", err);
     return null;
@@ -280,24 +282,54 @@ async function lookAtPage() {
 
   // No text anywhere on the page. If it draws the music instead — a tab
   // player, a score on a canvas — read the picture.
-  if (result && Array.isArray(result.score) && result.score.length) {
-    readPagePicture(result);
+  const hasScore = result && Array.isArray(result.score) && result.score.length;
+  const hasShots = result && Array.isArray(result.shots) && result.shots.length;
+  if (hasScore || hasShots) {
+    await readPagePicture(result);
     return;
   }
   if (result && result.reason) state.pageReason = result.reason === "unsupported" ? "unsupported" : "none";
 }
 
-/** Read the picture(s) the page gave us and, if there is music in them, use it. */
-function readPagePicture(result) {
-  const reading = readBestPicture(result.score);
+/** What a reading came to, short enough for one console line. */
+function describeReading(reading) {
+  if (!reading) return "nothing readable";
+  return { ok: reading.ok, reason: reading.reason, staves: reading.staves, strings: reading.strings, notes: reading.notes, bars: reading.bars, unreadable: reading.unreadable, confidence: reading.confidence };
+}
+
+/**
+ * Read the music off the page's pixels and, if there is music in them, use it.
+ *
+ * Two sources, in that order. A canvas hands over exactly what was drawn on
+ * it, which is the best picture of the music there is — but only if the page
+ * will part with it. A player drawing through WebGL, or from a worker, hands
+ * over nothing at all, and Ultimate Guitar's "Official" tabs are one of those:
+ * the page has a score on it that its own canvas will not give up. For those
+ * the picture is taken the way a person would take it, with a photograph of
+ * the window cropped to the player, which holds whatever is on the screen
+ * however the page drew it.
+ */
+async function readPagePicture(result) {
+  let reading = null;
+  if (Array.isArray(result.score) && result.score.length) {
+    reading = readBestPicture(result.score);
+    console.log("[tab2roll] read the canvas:", describeReading(reading));
+  }
+  if ((!reading || !reading.ok) && Array.isArray(result.shots) && result.shots.length) {
+    const photographed = await readPhotograph(result);
+    console.log("[tab2roll] read a photograph of the window:", describeReading(photographed));
+    reading = bestReading(reading, photographed);
+  }
   state.reading = reading;
   state.pageReason = "picture";
-  console.log("[tab2roll] read the picture:", reading ? { ok: reading.ok, reason: reading.reason, staves: reading.staves, strings: reading.strings, notes: reading.notes, bars: reading.bars, unreadable: reading.unreadable, confidence: reading.confidence } : "nothing readable");
   if (!reading || !reading.ok) return;
   state.earlier = state.tab ? getPictureRead(state.tab.url) : null;
   if (state.earlier && state.earlier.text === reading.text) state.earlier = null;
+  // The pixels themselves are deliberately left behind: state.page is read
+  // for the song's name and little else, and it is no place for a megabyte.
+  const { score, shots, view, seen, ...page } = result;
   state.page = {
-    ...result,
+    ...page,
     ok: true,
     text: reading.text,
     kind: "tab",
@@ -306,6 +338,38 @@ function readPagePicture(result) {
   };
   setPasteText(reading.text);
   if (state.tab) setPictureRead({ url: state.tab.url, text: reading.text });
+}
+
+/**
+ * Photograph the window and read the parts of it the page would not hand over.
+ *
+ * activeTab — granted by the click that opened this popup — is what allows
+ * this, and it allows it for this one tab, this once. Nothing is saved and
+ * nothing is sent: the photograph is cropped to the player, read, and gone by
+ * the time the popup closes.
+ */
+async function readPhotograph(result) {
+  if (!browser.tabs || typeof browser.tabs.captureVisibleTab !== "function") return null;
+  let photo = null;
+  try {
+    // PNG on purpose. A JPEG's smudges around a small "7" are exactly the
+    // kind of thing that turns it into a "1".
+    const windowId = state.tab && typeof state.tab.windowId === "number" ? state.tab.windowId : undefined;
+    photo = await browser.tabs.captureVisibleTab(windowId, { format: "png" });
+  } catch (err) {
+    console.warn("[tab2roll] could not photograph the window:", err && err.message ? err.message : err);
+    return null;
+  }
+  if (typeof photo !== "string" || !photo) return null;
+  const images = [];
+  for (const shot of result.shots) {
+    try {
+      images.push(await imageDataFromShot(photo, shot, result.view));
+    } catch (err) {
+      console.warn("[tab2roll] could not cut the player out of the photograph:", err && err.message ? err.message : err);
+    }
+  }
+  return images.length ? readBestPicture(images) : null;
 }
 
 // --------------------------------------------------------------------------

@@ -13,7 +13,8 @@ import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STRINGS } from "../src/strings.js";
-import { renderTab } from "./helpers/draw.js";
+import { renderTab, createImage } from "./helpers/draw.js";
+import { writePng } from "../tools/png.js";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
@@ -64,8 +65,13 @@ const STUB = (scenario) => `
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
     tabs: {
-      query: async () => [{ id: 7, url: scenario.url }],
+      query: async () => [{ id: 7, url: scenario.url, windowId: 3 }],
       create: async (o) => { calls.push(["tabs.create", o.url]); },
+      captureVisibleTab: async (windowId, options) => {
+        calls.push(["captureVisibleTab", { windowId: windowId === undefined ? null : windowId, format: options && options.format }]);
+        if (scenario.photoFails) throw new Error("Missing activeTab permission");
+        return scenario.photo || null;
+      },
     },
     scripting: {
       executeScript: async (o) => {
@@ -309,6 +315,58 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(sent.meta.source, "ultimate-guitar");
     assert.equal(sent.meta.title, "The Trooper");
     assert.equal(sent.meta.artist, "Iron Maiden");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a player whose canvas will not be read is photographed instead", async () => {
+    // Ultimate Guitar's "Official" tabs draw the score onto a canvas the page
+    // will not hand over — through WebGL, or from a worker. There are no
+    // pixels to take, only a rectangle on the screen, so the popup photographs
+    // the window with tabs.captureVisibleTab and reads that instead.
+    const drawn = ["|--0--2--3--2--|--0--------|", "|--------------|--1--------|", "|--------------|--0--------|", "|--2--2--2--2--|--2--------|", "|--------------|--3--------|", "|--3-----------|-----------|"].join("\n");
+    const picture = renderTab(drawn, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+    // A photograph arrives at the screen's own resolution, which is twice the
+    // page's measurements on any ordinary laptop. Getting that scale wrong is
+    // the whole difficulty of this route, so the test uses a screen where it
+    // is wrong by a factor of two if it is not worked out from the picture.
+    const dpr = 2;
+    const rect = { x: 30, y: 40, width: picture.width / dpr, height: picture.height / dpr };
+    const view = { width: Math.ceil(rect.x + rect.width + 30), height: Math.ceil(rect.y + rect.height + 30), dpr };
+    const photo = createImage(view.width * dpr, view.height * dpr, 255);
+    for (let y = 0; y < picture.height; y++) {
+      for (let x = 0; x < picture.width; x++) photo.gray[(y + rect.y * dpr) * photo.width + x + rect.x * dpr] = picture.gray[y * picture.width + x];
+    }
+    const shots = [{ reason: "no-2d-context", width: picture.width, height: picture.height, rect, scroll: { top: 0, height: 4000, visible: 500 } }];
+    const reply = { ok: true, filename: "Iron Maiden - The Trooper (tab).mid", kind: "tab", rhythmSource: "guessed", tuningId: "standard", tracks: ["Guitar (as tabbed)"], title: "The Trooper" };
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/iron-maiden/the-trooper-official-1935205",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", title: "The Trooper", artist: "Iron Maiden", shots, view },
+      photo: "data:image/png;base64," + Buffer.from(writePng(photo)).toString("base64"),
+      reply,
+    });
+
+    assert.equal(await visible(page, "#view-found"), true);
+    assert.equal(await text(page, "#found-label"), STRINGS.popup.foundPicture);
+    assert.equal(await text(page, "#song-title"), "The Trooper — Iron Maiden");
+    const box = await page.$eval("#paste-text", (el) => el.value);
+    assert.match(box, /^\|[-0-9|]+$/m);
+    assert.equal(box.split("\n").length, 6, "six strings, read off a photograph of the window");
+    // A photograph is a PNG on purpose: a JPEG's smudges turn 7s into 1s.
+    const shot = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "captureVisibleTab");
+    assert.deepEqual(shot[1], { windowId: 3, format: "png" }, "the window is named rather than left to be guessed at");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a player that cannot be photographed either says so, and does not throw", async () => {
+    const shots = [{ reason: "no-2d-context", width: 800, height: 400, rect: { x: 0, y: 0, width: 800, height: 400 }, scroll: null }];
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/x-official-1",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", shots, view: { width: 800, height: 600, dpr: 1 } },
+      photoFails: true,
+    });
+    assert.equal(await visible(page, "#view-notfound"), true);
+    assert.equal(await text(page, "#notfound-message"), STRINGS.popup.unsupported);
+    assert.equal(await visible(page, "#paste-body"), true);
     assert.deepEqual(errors, []);
   });
 

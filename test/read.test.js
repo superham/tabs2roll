@@ -12,6 +12,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { toGray, toInk, backgroundLevel, histogram, otsuThreshold, inkFraction } from "../src/read/image.js";
+import { cropBox, bestReading, coverageOf } from "../src/ui/picture.js";
 import { rowRuns, findStaffLines, groupSystems, findStaves, median, commonSize } from "../src/read/staff.js";
 import { eraseStaffLines, findComponents, holesOf, countHoles } from "../src/read/glyphs.js";
 import { classifyGlyph, normalizeGlyph, isMusicGlyph, MIN_CONFIDENCE } from "../src/read/digits.js";
@@ -594,4 +595,51 @@ test("PNG: the project's own screenshots decode", () => {
 test("PNG: anything else is turned down with a plain reason", () => {
   assert.equal(isPng(new Uint8Array([1, 2, 3])), false);
   assert.throws(() => readPng(new Uint8Array([1, 2, 3])), /not a PNG/);
+});
+
+// --------------------------------------------------------------------------
+// Cutting a player out of a photograph of the browser window
+// --------------------------------------------------------------------------
+
+test("cropBox: the scale is measured from the photograph, not assumed", () => {
+  const rect = { x: 100, y: 50, width: 400, height: 200 };
+  const view = { width: 1000, height: 800 };
+  // A screen at one device pixel per CSS pixel.
+  assert.deepEqual(cropBox(rect, view, 1000, 800), { x: 100, y: 50, width: 400, height: 200 });
+  // The same window on a laptop that draws two device pixels for each of
+  // them: the photograph is twice the size, and so is everything in it.
+  assert.deepEqual(cropBox(rect, view, 2000, 1600), { x: 200, y: 100, width: 800, height: 400 });
+});
+
+test("cropBox: a player taller than the window is cut off at the window", () => {
+  // Which is the whole reason the popup says "that's about 14% of the song".
+  const box = cropBox({ x: -20, y: 600, width: 900, height: 2000 }, { width: 1000, height: 800 }, 1000, 800);
+  assert.deepEqual(box, { x: 0, y: 600, width: 880, height: 200 });
+});
+
+test("cropBox: nothing comes back for a rectangle that is not in shot", () => {
+  const view = { width: 1000, height: 800 };
+  assert.equal(cropBox({ x: 0, y: 900, width: 400, height: 200 }, view, 1000, 800), null, "scrolled past the bottom");
+  assert.equal(cropBox({ x: -500, y: 10, width: 400, height: 200 }, view, 1000, 800), null, "off to the left");
+  assert.equal(cropBox(null, view, 1000, 800), null);
+  assert.equal(cropBox({ x: 0, y: 0, width: 10, height: 10 }, null, 1000, 800), null);
+});
+
+test("bestReading: the reading with more notes in it wins, and anything beats nothing", () => {
+  const poor = { ok: true, notes: 4, confidence: 0.9 };
+  const good = { ok: true, notes: 40, confidence: 0.8 };
+  const failed = { ok: false, reason: "no-staves" };
+  assert.equal(bestReading(poor, good), good);
+  assert.equal(bestReading(good, poor), good);
+  assert.equal(bestReading(null, poor), poor);
+  assert.equal(bestReading(poor, null), poor);
+  assert.equal(bestReading(null, null), null);
+  assert.equal(bestReading(poor, failed), poor, "a reading is never given up for one that failed");
+  assert.equal(bestReading(failed, poor), poor);
+});
+
+test("coverageOf: a screenful of a long score is reported as a share of it", () => {
+  assert.equal(coverageOf({ top: 0, height: 6503, visible: 935 }), 14);
+  assert.equal(coverageOf({ top: 0, height: 1000, visible: 950 }), null, "all of it, near enough, so nothing to say");
+  assert.equal(coverageOf(null), null);
 });
