@@ -34,6 +34,7 @@ export { findStaffLines, groupSystems, findStaves } from "./staff.js";
 export { classifyGlyph } from "./digits.js";
 export { readSystem, columnsOf } from "./score.js";
 export { toAsciiTab, systemToAscii } from "./ascii.js";
+export { wholeSystems, wholeReading, readTo, stitchReads, EDGE_MARGIN } from "./stitch.js";
 
 /** A picture with less ink than this is blank: an empty canvas, a loading page. */
 export const MIN_INK = 0.0005;
@@ -57,8 +58,9 @@ export const REASONS = {
  *   inverted  force light-on-dark; by default the picture is asked
  *   minConfidence  how sure the reader must be of a mark to use it
  *
- * Returns { ok, text, reason, staves, notes, bars, unreadable, confidence,
- * systems }. `ok` false always comes with a `reason`, never an empty success.
+ * Returns { ok, text, reason, width, height, staves, notes, bars, unreadable,
+ * confidence, systems }. `ok` false always comes with a `reason`, never an
+ * empty success.
  */
 export function readSheetMusic(image, options = {}) {
   const bitmap = toInk(image, options);
@@ -81,6 +83,11 @@ export function readSheetMusic(image, options = {}) {
   return {
     ok: true,
     text,
+    // The size of the picture this came out of. The staves carry their
+    // positions in it, and src/read/stitch.js needs both to tell a staff that
+    // ended from one that ran off the bottom of the screen.
+    width: bitmap.width,
+    height: bitmap.height,
     reason: null,
     staves: tabs.length,
     notation: systems.length - tabs.length,
@@ -118,5 +125,5 @@ export function confidenceOf(systems, unreadable, notes) {
 }
 
 function empty(reason, extra) {
-  return { ok: false, text: "", reason, staves: 0, notation: 0, strings: 0, notes: 0, bars: 0, unreadable: 0, confidence: 0, systems: [], ...extra };
+  return { ok: false, text: "", reason, width: 0, height: 0, staves: 0, notation: 0, strings: 0, notes: 0, bars: 0, unreadable: 0, confidence: 0, systems: [], ...extra };
 }

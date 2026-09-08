@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { toGray, toInk, backgroundLevel, histogram, otsuThreshold, inkFraction } from "../src/read/image.js";
 import { cropBox, bestReading, coverageOf } from "../src/ui/picture.js";
+import { wholeSystems, wholeReading, readTo, stitchReads } from "../src/read/stitch.js";
 import { rowRuns, findStaffLines, groupSystems, findStaves, median, commonSize } from "../src/read/staff.js";
 import { eraseStaffLines, findComponents, holesOf, countHoles } from "../src/read/glyphs.js";
 import { classifyGlyph, normalizeGlyph, isMusicGlyph, MIN_CONFIDENCE } from "../src/read/digits.js";
@@ -642,4 +643,114 @@ test("coverageOf: a screenful of a long score is reported as a share of it", () 
   assert.equal(coverageOf({ top: 0, height: 6503, visible: 935 }), 14);
   assert.equal(coverageOf({ top: 0, height: 1000, visible: 950 }), null, "all of it, near enough, so nothing to say");
   assert.equal(coverageOf(null), null);
+});
+
+// --------------------------------------------------------------------------
+// Reading a score that does not fit on the screen
+// --------------------------------------------------------------------------
+
+/** A staff at a known place in the picture, of the shape readSystem hands back. */
+function system(top, bottom, { kind = "tab", spacing = 10, events = 4, bars = 2, unreadable = 0, strings = 6 } = {}) {
+  return { kind, strings, spacing, top, bottom, events: new Array(events).fill({ score: 1 }), columns: [], bars: new Array(bars).fill(0), unreadable, marks: events };
+}
+
+test("wholeSystems: a staff running off the bottom of the screen is dropped", () => {
+  // Six lines cut down to four still group as a staff — a bass, to look at
+  // it — so a staff on the fold is music nobody played. The rule is a whole
+  // line spacing of clear picture below the last line: if a line could be
+  // hiding just off the bottom, this staff is not to be trusted.
+  const staves = [system(40, 90), system(200, 250), system(360, 410)];
+  assert.deepEqual(wholeSystems(staves, 500).map((s) => s.top), [40, 200, 360]);
+  assert.deepEqual(wholeSystems(staves, 420).map((s) => s.top), [40, 200, 360], "exactly one spacing of clear air is enough");
+  assert.deepEqual(wholeSystems(staves, 419).map((s) => s.top), [40, 200], "one pixel less is not");
+  assert.deepEqual(wholeSystems(staves, 260).map((s) => s.top), [40, 200]);
+  assert.deepEqual(wholeSystems(staves, 0).map((s) => s.top), [40, 200, 360], "no height, nothing to be cut off by");
+});
+
+test("wholeSystems: the top edge is left alone", () => {
+  // The scroll lands the next staff hard against the top of the picture on
+  // purpose. Trimming there would drop the bars the scroll was made to reach.
+  const staves = [system(0, 50), system(200, 250)];
+  assert.equal(wholeSystems(staves, 500).length, 2);
+});
+
+test("readTo: the next look starts past the last whole staff", () => {
+  const staves = [system(40, 90), system(200, 250), system(360, 410)];
+  // Past the bottom of the last whole staff, clear of its own lines.
+  assert.equal(readTo(staves, 419), 260);
+  assert.equal(readTo(staves, 500), 420);
+  // Never past the end of the picture, because a staff is only kept when
+  // that much clear picture was found below it.
+  assert.equal(readTo([system(40, 85)], 100), 95);
+  // A picture with nothing whole in it has nothing to measure from.
+  assert.equal(readTo([system(40, 495)], 500), null);
+  assert.equal(readTo([], 500), null);
+});
+
+test("wholeReading: a screenful is cut down to the staves that were whole", () => {
+  // A real picture of two staves, read for real, then told the screen ended
+  // part-way down the second one — which is what a tab player looks like.
+  const two = ["|--0--2--3--|", "|-----------|", "|--2--2--2--|", "|-----------|", "|-----------|", "|--3--------|"].join("\n");
+  const picture = renderTab([two, two].join("\n\n"), { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const reading = readSheetMusic(picture);
+  assert.equal(reading.staves, 2);
+
+  const whole = wholeReading({ ...reading, height: reading.systems[1].bottom });
+  assert.equal(whole.staves, 1, "the second one runs off the bottom of the screen");
+  assert.equal(whole.text.split("\n").length, 6, "one staff, six strings");
+  assert.equal(whole.text, reading.text.split("\n\n")[0]);
+  assert.ok(whole.notes > 0 && whole.notes < reading.notes);
+
+  // Nothing whole, nothing to keep — and never an empty success.
+  assert.equal(wholeReading({ ...reading, height: reading.systems[0].bottom }), null);
+  assert.equal(wholeReading({ ok: false, reason: "no-staves" }), null);
+  assert.equal(wholeReading(null), null);
+});
+
+test("stitchReads: the screenfuls join in the order they were read", () => {
+  const stitched = stitchReads([
+    { ok: true, text: "|--0--|", notes: 2, bars: 1, staves: 1, strings: 6, unreadable: 0, confidence: 1 },
+    { ok: true, text: "|--3--|", notes: 4, bars: 1, staves: 1, strings: 6, unreadable: 1, confidence: 0.5 },
+  ]);
+  assert.equal(stitched.ok, true);
+  assert.equal(stitched.text, "|--0--|\n\n|--3--|");
+  assert.equal(stitched.screenfuls, 2);
+  assert.equal(stitched.notes, 6);
+  assert.equal(stitched.bars, 2);
+  assert.equal(stitched.unreadable, 1);
+  // Weighted by notes: four notes read at half confidence and two read sure.
+  assert.equal(stitched.confidence, (1 * 2 + 0.5 * 4) / 6);
+  // The whole song was read, so there is no share of it left to report.
+  assert.equal(stitched.scroll, null);
+});
+
+test("stitchReads: a page that did not move is not read twice", () => {
+  const same = { ok: true, text: "|--0--|", notes: 2, bars: 1, staves: 1, strings: 6, unreadable: 0, confidence: 1 };
+  const stitched = stitchReads([same, { ...same }, { ok: false, reason: "no-staves" }, { ok: true, text: "  ", notes: 0 }]);
+  assert.equal(stitched.text, "|--0--|");
+  assert.equal(stitched.screenfuls, 1);
+  assert.equal(stitched.notes, 2, "the counts follow the tab, not the work it took");
+});
+
+test("stitchReads: nothing readable anywhere is a failure with a reason", () => {
+  const stitched = stitchReads([{ ok: false, reason: "no-staves" }]);
+  assert.equal(stitched.ok, false);
+  assert.equal(stitched.reason, "no-notes");
+  assert.equal(stitched.text, "");
+  assert.equal(stitchReads([]).ok, false);
+});
+
+test("readSheetMusic says how big the picture was, so a staff on the fold can be spotted", () => {
+  const picture = renderTab(["|--0--2--3--|", "|-----------|", "|--2--2--2--|", "|-----------|", "|-----------|", "|--3--------|"].join("\n"), {
+    spacing: 15,
+    columnWidth: 8,
+    digitHeight: 11,
+    digitWidth: 7,
+  });
+  const reading = readSheetMusic(picture);
+  assert.equal(reading.ok, true);
+  assert.equal(reading.width, picture.width);
+  assert.equal(reading.height, picture.height);
+  // Every staff in it is whole, so trimming takes nothing away.
+  assert.equal(wholeReading(reading).text, reading.text);
 });

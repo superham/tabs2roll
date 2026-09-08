@@ -88,8 +88,11 @@ export async function imageDataFromShot(photo, shot, view) {
     context.drawImage(bitmap, box.x, box.y, box.width, box.height, 0, 0, width, height);
     const image = context.getImageData(0, 0, width, height);
     // A plain object rather than the ImageData itself, so the scroll state
-    // travels with the pixels the way a canvas picture's does.
-    return { width, height, data: image.data, scroll: (shot && shot.scroll) || null };
+    // travels with the pixels the way a canvas picture's does. cssPerPixel is
+    // how much of the page one pixel of this crop is worth, which is what
+    // turns "the last whole staff ends here" into "scroll by this much".
+    const cssPerPixel = view && view.height ? box.height / (bitmap.height / view.height) / height : null;
+    return { width, height, data: image.data, scroll: (shot && shot.scroll) || null, cssPerPixel };
   } finally {
     if (typeof bitmap.close === "function") bitmap.close();
   }
@@ -130,6 +133,11 @@ export function readBestPicture(images, options = {}) {
       continue;
     }
     reading.scroll = image.scroll || null;
+    // How much of the page one pixel of this picture is worth. A canvas says
+    // it by where it sits on the screen against how big its buffer is — an
+    // ordinary laptop draws two buffer pixels for each one of the page's.
+    reading.cssPerPixel =
+      typeof image.cssPerPixel === "number" ? image.cssPerPixel : image.rect && image.rect.height && image.height ? image.rect.height / image.height : null;
     best = bestReading(best, reading);
   }
   return best;

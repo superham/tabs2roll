@@ -8,6 +8,7 @@ import { fillStrings, browser, getOptions, getLastResult, setLastResult, getPict
 import { detect } from "../parse/index.js";
 import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
 import { imageDataFromFile, imageDataFromShot, imageFileOf, readBestPicture, bestReading, coverageOf } from "./picture.js";
+import { wholeReading, readTo, stitchReads } from "../read/stitch.js";
 
 const P = STRINGS.popup;
 const $ = (id) => document.getElementById(id);
@@ -26,6 +27,15 @@ const RESULT_GLOBAL = "__tab2rollResult"; // must match tools/build-injected.js
 /** Only ordinary web pages can be read. Not about:, moz-extension:, view-source:. */
 const READABLE_URL = /^https?:\/\//i;
 
+// Reading a whole song a screenful at a time. The cap is a stop, not a
+// target: a long song is a dozen screenfuls and anything near forty means the
+// page is not moving the way we think it is.
+const MAX_SCREENFULS = 40;
+/** Never scroll by less than this, or a page that will not move loops forever. */
+const MIN_SCROLL_STEP = 40;
+/** How long to let the player redraw after a scroll before looking again. */
+const REDRAW_MS = 140;
+
 const state = {
   tab: null, // { id, url } of the page the popup opened on
   page: null, // extraction result with kind, or null
@@ -36,6 +46,7 @@ const state = {
   lastConversion: null, // { text, meta, options } for "Wrong tuning? Re-do as:"
   reading: null, // what came back from reading a picture of the music
   earlier: null, // an earlier picture read of this same page, to join onto
+  wholeSong: false, // true while scrolling the page and reading it right through
 };
 
 // --------------------------------------------------------------------------
@@ -103,11 +114,30 @@ function renderPicturePanel() {
   note.hidden = !showing;
   partial.hidden = !showing;
   join.hidden = !(showing && state.earlier);
+  renderWholeSong();
   if (!showing) return;
   note.textContent = `${P.pictureNotes(reading.notes)} ${reading.unreadable ? P.pictureUnsure : P.pictureCheck}`;
   const percent = coverageOf(reading.scroll);
   partial.hidden = percent === null;
   if (percent !== null) partial.textContent = P.picturePartial(percent);
+}
+
+/**
+ * The offer to read the rest of the song, and how it is going.
+ *
+ * Offered only when there is a rest to read: a picture read that covered the
+ * whole score has nothing to scroll to, and a button that does nothing is
+ * worse than no button.
+ */
+function renderWholeSong() {
+  const button = $("whole-song");
+  const status = $("whole-song-status");
+  const reading = state.reading;
+  const partial = !!(state.page && state.page.fromPicture && reading && reading.ok && coverageOf(reading.scroll) !== null);
+  button.hidden = !(partial || state.wholeSong);
+  button.disabled = state.wholeSong;
+  status.hidden = !state.wholeSong;
+  if (state.wholeSong) status.textContent = P.wholeSongWorking(1);
 }
 
 function renderPageState() {
@@ -310,6 +340,17 @@ function describeReading(reading) {
  * however the page drew it.
  */
 async function readPagePicture(result) {
+  const reading = await readScreenful(result);
+  state.reading = reading;
+  state.pageReason = "picture";
+  if (!reading || !reading.ok) return;
+  state.earlier = state.tab ? getPictureRead(state.tab.url) : null;
+  if (state.earlier && state.earlier.text === reading.text) state.earlier = null;
+  usePictureRead(result, reading);
+}
+
+/** One look at the page: the canvas if it will give up its pixels, a photograph if not. */
+async function readScreenful(result) {
   let reading = null;
   if (Array.isArray(result.score) && result.score.length) {
     reading = readBestPicture(result.score);
@@ -320,11 +361,11 @@ async function readPagePicture(result) {
     console.log("[tab2roll] read a photograph of the window:", describeReading(photographed));
     reading = bestReading(reading, photographed);
   }
-  state.reading = reading;
-  state.pageReason = "picture";
-  if (!reading || !reading.ok) return;
-  state.earlier = state.tab ? getPictureRead(state.tab.url) : null;
-  if (state.earlier && state.earlier.text === reading.text) state.earlier = null;
+  return reading;
+}
+
+/** Take a reading as this page's answer: into the paste box, and remembered. */
+function usePictureRead(result, reading) {
   // The pixels themselves are deliberately left behind: state.page is read
   // for the song's name and little else, and it is no place for a megabyte.
   const { score, shots, view, seen, ...page } = result;
@@ -370,6 +411,156 @@ async function readPhotograph(result) {
     }
   }
   return images.length ? readBestPicture(images) : null;
+}
+
+/**
+ * Scroll the page's score and wait for the player to redraw it.
+ *
+ * RUNS INSIDE THE TAB PAGE, and it is the one thing tab2roll ever does that
+ * changes anything there. It only ever scrolls, it is only ever reached by
+ * the user pressing "read the whole song", and the popup puts the page back
+ * where it found it when the reading is done.
+ *
+ * The scroller is found the way a person would find it: from the biggest
+ * canvas on the page, out through its ancestors to the first one that
+ * actually scrolls, and failing that the page itself. That last case is not
+ * an edge case — Ultimate Guitar's player is sticky inside a tall spacer, so
+ * on a full-size window it is the document that moves and not the player.
+ *
+ * `behavior: "instant"` is not decoration. These players set
+ * `scroll-behavior: smooth`, and a canvas caught part-way through an
+ * animation is a photograph of nothing in particular.
+ */
+const SCROLL_SCORE = async (by, to, settleMs) => {
+  let canvas = null;
+  for (const c of document.querySelectorAll("canvas")) {
+    if (!canvas || c.width * c.height > canvas.width * canvas.height) canvas = c;
+  }
+  const view = document.defaultView;
+  let scroller = document.scrollingElement || document.documentElement;
+  let node = canvas ? canvas.parentElement : null;
+  for (let depth = 0; node && depth < 20; depth++) {
+    const overflow = view ? view.getComputedStyle(node).overflowY : "";
+    if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight + 8) {
+      scroller = node;
+      break;
+    }
+    node = node.parentElement;
+  }
+  if (!scroller) return null;
+  const was = scroller.scrollTop;
+  const want = typeof to === "number" ? to : was + by;
+  scroller.scrollTo({ top: want, left: scroller.scrollLeft, behavior: "instant" });
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, settleMs))));
+  const top = scroller.scrollTop;
+  return {
+    was,
+    top,
+    moved: top - was,
+    height: scroller.scrollHeight,
+    visible: scroller.clientHeight,
+    atEnd: top + scroller.clientHeight >= scroller.scrollHeight - 2,
+  };
+};
+
+/** Run SCROLL_SCORE in the page. `to` overrides `by` when it is a number. */
+async function scrollScore(tabId, by, to = null) {
+  try {
+    const results = await browser.scripting.executeScript({ target: { tabId }, func: SCROLL_SCORE, args: [by || 0, to, REDRAW_MS] });
+    return firstResult(results);
+  } catch (err) {
+    console.warn("[tab2roll] could not scroll the page:", err && err.message ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * How far to scroll before the next look, in the page's own pixels.
+ *
+ * Past the last staff that was certainly whole, so the next look starts on
+ * music nobody has read yet and no staff is read twice. When nothing in the
+ * picture was whole there is nothing to measure from, and a plain screenful
+ * — a little short of one, so a staff on the fold is not jumped clean over —
+ * is the honest fallback.
+ */
+function scrollStepFor(reading, visible) {
+  const screenful = Math.max(MIN_SCROLL_STEP, Math.round((visible || 0) * 0.8));
+  if (!reading || !reading.ok || !reading.cssPerPixel) return screenful;
+  const to = readTo(reading.systems, reading.height);
+  if (!to) return screenful;
+  return Math.max(MIN_SCROLL_STEP, Math.round(to * reading.cssPerPixel));
+}
+
+/**
+ * Read the whole song: look, scroll, look again, all the way down.
+ *
+ * One click reads the screenful that happens to be showing, which on a
+ * four-minute song is a verse if you are lucky. This walks the page instead,
+ * keeping only the staves that were certainly whole in each look and starting
+ * the next one just past them, so nothing is read twice and nothing on the
+ * fold is lost. The page goes back where it was at the end, whatever happened
+ * on the way — including if it threw.
+ */
+async function readWholeSong() {
+  if (!state.tab || typeof state.tab.id !== "number" || state.wholeSong) return;
+  const tabId = state.tab.id;
+  state.wholeSong = true;
+  renderWholeSong();
+
+  const reads = [];
+  let home = null;
+  let visible = state.reading && state.reading.scroll ? state.reading.scroll.visible : 0;
+  try {
+    for (let pass = 0; pass < MAX_SCREENFULS; pass++) {
+      $("whole-song-status").textContent = P.wholeSongWorking(pass + 1);
+      const result = await runExtractor(tabId);
+      if (!result) break;
+      const reading = await readScreenful(result);
+      // Only the staves that were certainly whole. A screenful with nothing
+      // whole in it contributes nothing rather than a staff that might be
+      // four lines of a six-line one; the single read this started from is
+      // still there to fall back on if the walk comes to less than it did.
+      const whole = wholeReading(reading);
+      if (whole) reads.push(whole);
+
+      const where = await scrollScore(tabId, scrollStepFor(reading, visible));
+      if (!where) break;
+      if (home === null) home = where.was;
+      visible = where.visible || visible;
+      if (where.atEnd || where.moved < 1) break;
+    }
+  } finally {
+    if (home !== null) await scrollScore(tabId, 0, home);
+    state.wholeSong = false;
+  }
+
+  const stitched = stitchReads(reads);
+  console.log("[tab2roll] read the whole song:", { ...describeReading(stitched), screenfuls: stitched.screenfuls });
+  // Nothing more than one click had already read: a page that would not
+  // scroll, or one whose next screenfuls held no staff we could trust. What
+  // was already in the box stays there, and the reason is said out loud.
+  if (!stitched.ok || (state.reading && state.reading.ok && stitched.notes <= state.reading.notes)) {
+    renderWholeSong();
+    saidAfterTheWalk(P.wholeSongNothing);
+    return;
+  }
+  state.reading = stitched;
+  usePictureRead(state.page || { site: "picture" }, stitched);
+  state.earlier = null;
+  renderPageState();
+  saidAfterTheWalk(P.wholeSongRead(stitched.screenfuls));
+}
+
+/**
+ * How the walk went, left on the screen after it.
+ *
+ * Both renderers above hide this line, because while nothing is walking there
+ * is nothing to say. Saying it means putting it back.
+ */
+function saidAfterTheWalk(message) {
+  const status = $("whole-song-status");
+  status.hidden = false;
+  status.textContent = message;
 }
 
 // --------------------------------------------------------------------------
@@ -542,6 +733,15 @@ function wireEvents() {
   $("paste-toggle").addEventListener("click", () => setPasteOpen($("paste-body").hidden));
   $("paste-text").addEventListener("input", onPasteInput);
   $("picture-join").addEventListener("click", onPictureJoin);
+  $("whole-song").addEventListener("click", () => {
+    readWholeSong().catch((err) => {
+      console.error("[tab2roll] reading the whole song went wrong", err);
+      state.wholeSong = false;
+      renderWholeSong();
+      $("whole-song-status").hidden = false;
+      $("whole-song-status").textContent = P.wholeSongNothing;
+    });
+  });
   document.addEventListener("dragover", (e) => e.preventDefault());
   document.addEventListener("drop", onDrop);
   document.addEventListener("paste", onPasteEvent);
