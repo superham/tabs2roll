@@ -41,6 +41,17 @@ export const SPACING_TOLERANCE = 0.3;
 export const MAX_GAP_RATIO = 1.7;
 
 /**
+ * How much longer or shorter than its neighbours a line of one staff may be.
+ *
+ * The lines of a staff are drawn to the same length as each other, always.
+ * Nothing else on the page is: the flat top of a slur, an underline, a page
+ * rule. Without this, two slurs arching over the same bar at the same height
+ * read as one more line above the staff — and a six-string staff that comes
+ * back as a seven-string one puts every note on the wrong string, quietly.
+ */
+export const RUN_RATIO = [0.55, 1.6];
+
+/**
  * How wide a hole in a line may be before it counts as two lines.
  *
  * A first guess only. The hole an engraver leaves behind a fret number is
@@ -183,6 +194,38 @@ export function median(values) {
 }
 
 /**
+ * The size most of a list agrees on.
+ *
+ * Not the median, which one odd group can drag across, and not the mean.
+ * Every fret number in a score is set at one size, so the size that the most
+ * marks cluster around IS the size of a fret number — however many clef
+ * letters, time signatures and bar numbers are mixed in with them, and
+ * whether they are bigger or smaller. `tolerance` is the fraction either way
+ * that still counts as the same size.
+ */
+export function commonSize(values, tolerance = 0.2) {
+  if (!values.length) return 0;
+  let best = values[0];
+  let bestSupport = -1;
+  for (const value of values) {
+    if (!(value > 0)) continue;
+    let support = 0;
+    let total = 0;
+    for (const other of values) {
+      if (Math.abs(other - value) <= value * tolerance) {
+        support++;
+        total += other;
+      }
+    }
+    if (support > bestSupport) {
+      bestSupport = support;
+      best = total / support;
+    }
+  }
+  return best;
+}
+
+/**
  * Gather lines into staves.
  *
  * A staff is a run of lines at one even spacing. Two things end it: a gap
@@ -203,6 +246,12 @@ export function groupSystems(lines, options = {}) {
     spacing = 0;
   };
 
+  /** True when this line is drawn to much the same length as the group's. */
+  const sameLength = (line) => {
+    const runs = median(group.map((l) => l.run)) || line.run;
+    return line.run >= runs * RUN_RATIO[0] && line.run <= runs * RUN_RATIO[1];
+  };
+
   for (let i = 0; i < lines.length; i++) {
     if (!group.length) {
       group = [lines[i]];
@@ -212,7 +261,7 @@ export function groupSystems(lines, options = {}) {
     if (group.length === 1) {
       // Two lines do not yet make a spacing. Accept the second one unless it
       // is implausibly far away, and let the third decide.
-      if (gap > 0 && gap < (options.maxSpacing || 200)) {
+      if (gap > 0 && gap < (options.maxSpacing || 200) && sameLength(lines[i])) {
         group.push(lines[i]);
         spacing = gap;
       } else {
@@ -220,7 +269,7 @@ export function groupSystems(lines, options = {}) {
       }
       continue;
     }
-    const agrees = Math.abs(gap - spacing) <= spacing * tolerance;
+    const agrees = Math.abs(gap - spacing) <= spacing * tolerance && sameLength(lines[i]);
     if (agrees && gap <= spacing * maxGap) {
       group.push(lines[i]);
       spacing = median(gapsOf(group));

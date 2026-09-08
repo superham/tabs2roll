@@ -208,10 +208,11 @@ export function countHoles(component) {
  * still counts as open.
  *
  * Where the hole sits matters as much as how many there are. A 0, a 6 and a 9
- * are the same shape with the hole in a different place and a different size,
- * and blurred pictures of them are easy to mistake for one another; the hole
- * tells them apart at a glance. Returns { count, cy, area } with the biggest
- * hole's middle and size given as fractions of the mark's own box.
+ * are the same shape with the hole in a different place and a different size.
+ * So are an 8 and a B: the B's stem down the left pushes both its counters to
+ * the right, and nothing else about the two shapes is different enough to
+ * count on. Returns { count, cx, cy, area } with the biggest hole's middle
+ * and size given as fractions of the mark's own box.
  */
 export function holesOf(component) {
   const w = component.width + 2;
@@ -244,12 +245,14 @@ export function holesOf(component) {
   const holeSeen = new Uint8Array(w * h);
   let holes = 0;
   let biggest = 0;
+  let biggestX = 0;
   let biggestY = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const at = y * w + x;
       if (outside[at] || holeSeen[at] || filled(x, y)) continue;
       let size = 0;
+      let sumX = 0;
       let sumY = 0;
       const fill = [at];
       holeSeen[at] = 1;
@@ -258,6 +261,7 @@ export function holesOf(component) {
         size++;
         const hx = here % w;
         const hy = (here - hx) / w;
+        sumX += hx;
         sumY += hy;
         const around = [
           [hx - 1, hy],
@@ -278,12 +282,14 @@ export function holesOf(component) {
       holes++;
       if (size > biggest) {
         biggest = size;
+        biggestX = sumX / size;
         biggestY = sumY / size;
       }
     }
   }
   return {
     count: holes,
+    cx: biggest ? (biggestX - 1) / component.width : 0,
     cy: biggest ? (biggestY - 1) / component.height : 0,
     area: biggest / (component.width * component.height),
   };

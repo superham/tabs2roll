@@ -25,9 +25,15 @@ test.
 `pictures/` holds the other kind of fixture: `<name>.png` is a drawing of a tab and
 `<name>.tab.txt` is the tab it was drawn from, which is the ground truth a person can read.
 The test reads the PNG and checks it gets those notes back, on those strings, in that
-order. Between them the six cover every digit, two-digit frets, chords, dead notes, a bass
-staff, two staves one after another, a light-on-dark player and a staff sitting in the
+order. Between them they cover every digit, two-digit frets, chords, dead notes, a bass
+staff, two staves one after another, a light-on-dark player, and a staff sitting in the
 middle of a page with navigation, rules and lyrics around it.
+
+`player-page.png` is the one drawn the way a real tab player draws: the word TAB down the
+front of the staff, a time signature, bar numbers, the H and P of hammer-ons and pull-offs
+with their slurs, a vibrato squiggle, a note held over in brackets, the rhythm beamed
+underneath with a triplet bracket, and the player's own cursor across it all. None of that
+is music and none of it may become notes.
 
 The digits in those pictures are a plain 5x7 terminal font — a 1 with a foot on it, a
 flat-topped 3, a 4 open at the corner — and none of those are the letterforms

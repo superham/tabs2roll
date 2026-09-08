@@ -12,7 +12,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { toGray, toInk, backgroundLevel, histogram, otsuThreshold, inkFraction } from "../src/read/image.js";
-import { rowRuns, findStaffLines, groupSystems, findStaves, median } from "../src/read/staff.js";
+import { rowRuns, findStaffLines, groupSystems, findStaves, median, commonSize } from "../src/read/staff.js";
 import { eraseStaffLines, findComponents, holesOf, countHoles } from "../src/read/glyphs.js";
 import { classifyGlyph, normalizeGlyph, isMusicGlyph, MIN_CONFIDENCE } from "../src/read/digits.js";
 import { readSystem, joinDigits, columnsOf, staffKind } from "../src/read/score.js";
@@ -25,25 +25,36 @@ import { readPng, writePng, isPng } from "../tools/png.js";
 
 const PICTURES = new URL("./fixtures/pictures/", import.meta.url).pathname;
 
-/** The notes a piece of ASCII tab holds, in playing order, top string first. */
+/**
+ * The notes a piece of ASCII tab holds, in playing order, top string first.
+ *
+ * A fret in brackets is a note held over, and comes back with its brackets —
+ * counted at the column of its NUMBER, because that is what lines up with the
+ * notes around it, brackets or no brackets.
+ */
 function notesOf(text) {
-  return text
-    .split(/\n\s*\n/)
-    .flatMap((block, stave) => {
-      const lines = block.split("\n").map((l) => l.replace(/^\s*[A-Ga-g#b]?\s*\|/, "")).filter((l) => l.length);
-      const out = [];
-      const width = Math.max(...lines.map((l) => l.length));
-      for (let c = 0; c < width; c++) {
-        for (let s = 0; s < lines.length; s++) {
-          const ch = lines[s][c];
-          if (!ch || ch === "-" || ch === "|") continue;
-          if (/\d/.test(ch) && /\d/.test(lines[s][c - 1] || "")) continue;
-          const both = /\d/.test(ch) && /\d/.test(lines[s][c + 1] || "");
-          out.push(`${stave}.${s}:${both ? ch + lines[s][c + 1] : ch}`);
-        }
+  return text.split(/\n\s*\n/).flatMap((block, stave) => {
+    const lines = block
+      .split("\n")
+      .map((l) => l.replace(/^\s*[A-Ga-g#b]?\s*\|+/, ""))
+      .filter((l) => l.length);
+    const out = [];
+    const width = Math.max(...lines.map((l) => l.length));
+    for (let c = 0; c < width; c++) {
+      for (let s = 0; s < lines.length; s++) {
+        const line = lines[s];
+        const ch = line[c];
+        if (!/[\dx]/.test(ch || "")) continue;
+        if (/[\dx]/.test(line[c - 1] || "")) continue; // the tail of a number already counted
+        let at = c;
+        let fret = "";
+        while (/[\dx]/.test(line[at] || "")) fret += line[at++];
+        const held = line[c - 1] === "(" && line[at] === ")";
+        out.push(`${stave}.${s}:${held ? `(${fret})` : fret}`);
       }
-      return out;
-    });
+    }
+    return out;
+  });
 }
 
 /** A component of the shape findComponents makes, straight from ASCII art. */
@@ -399,6 +410,73 @@ test("two marks squeezed together still get a dash between them", () => {
   assert.match(systemToAscii(system)[0], /12-14/);
 });
 
+test("commonSize is the size most marks agree on, not the middle one", () => {
+  // Nine fret numbers and three clef letters half again as tall. The median
+  // would be a number here too, but only because the numbers happen to
+  // outnumber the letters three to one; the agreed size says so outright.
+  const heights = [10, 10, 11, 10, 10, 9, 10, 11, 10, 15, 15, 16];
+  assert.ok(Math.abs(commonSize(heights) - 10) < 0.5, `got ${commonSize(heights)}`);
+  assert.equal(commonSize([]), 0);
+});
+
+test("a bar of mostly dead notes keeps the two real numbers in it", () => {
+  // A dead note is drawn smaller than a fret number, and in a muted strumming
+  // bar there are more of them than there are numbers. Measuring the size of
+  // "a fret number on this staff" across every mark would make the two real
+  // numbers look oversized and throw them both away.
+  const tab = ["|--x--3--x--x--x--|", "|--x-----x--x--x--|", "|--x--0--x--x--x--|", "|-----------------|", "|-----------------|", "|-----------------|"].join("\n");
+  const reading = readSheetMusic(renderTab(tab));
+  assert.equal(reading.ok, true);
+  assert.deepEqual(notesOf(reading.text), notesOf(tab));
+});
+
+test("a fret in brackets is a note held over, not three marks", () => {
+  // Tab players write a note tied over from the bar before in brackets. Left
+  // unrecognised each bracket reads as some narrow mark of its own — most
+  // often a 1 — so a held 7 came back as three notes, or as the 17th fret.
+  const tab = ["|--(7)-7--5--|", "|------------|", "|--------(9)-|", "|------------|", "|------------|", "|------------|"].join("\n");
+  const reading = readSheetMusic(renderTab(tab, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 }));
+  assert.equal(reading.ok, true);
+  assert.deepEqual(notesOf(reading.text), notesOf(tab));
+  const held = reading.systems[0].events.filter((e) => e.ghost);
+  assert.deepEqual(held.map((e) => `${e.string}:${e.fret}`), ["0:7", "2:9"]);
+  // ...and the parser downstream already knows what a bracketed fret means.
+  const ir = convertText(reading.text, { source: "paste", arrange: false });
+  assert.equal(ir.ir.tracks[0].notes.filter((n) => String(n.technique || "").includes("ghost")).length, 2);
+});
+
+test("a slur is not a fret number", () => {
+  // The arc joining two hammered notes is drawn a whisker above the string,
+  // near enough to read as sitting on it. It is told apart by being five or
+  // ten times as wide as it is tall.
+  const tab = ["|--5--7--5--|", "|-----------|", "|-----------|", "|-----------|", "|-----------|", "|-----------|"].join("\n");
+  const picture = renderTab(tab, { spacing: 15, columnWidth: 9, digitHeight: 11, digitWidth: 7 });
+  for (let i = 0; i < 2; i++) {
+    for (let dx = 0; dx < 40; dx++) {
+      const x = 26 + i * 18 + dx;
+      fillRect(picture, x, 11 - Math.round(Math.sin((dx / 40) * Math.PI) * 4), 1, 1, 0);
+    }
+  }
+  const reading = readSheetMusic(picture);
+  assert.equal(reading.ok, true);
+  // Two slurs arching over the same bar sit at the same height, which is
+  // exactly what a staff line looks like. A staff that came back with seven
+  // strings would put every note on the wrong one, without a word.
+  assert.equal(reading.strings, 6);
+  assert.deepEqual(notesOf(reading.text), notesOf(tab));
+  assert.equal(reading.unreadable, 0, "and it is not reported as something it could not read, either");
+});
+
+test("a short stroke at the right height is not the staff's seventh line", () => {
+  const img = createImage(300, 160, 255);
+  for (let dx = 0; dx < 40; dx++) fillRect(img, 60 + dx, 26, 1, 1, 0); // a slur, one spacing above
+  for (let i = 0; i < 6; i++) fillRect(img, 20, 40 + i * 14, 260, 1, 0);
+  const systems = groupSystems(findStaffLines(toInk(img)));
+  assert.equal(systems.length, 1);
+  assert.equal(systems[0].count, 6);
+  assert.equal(systems[0].lines[0].y, 40);
+});
+
 // --------------------------------------------------------------------------
 // The fixtures
 // --------------------------------------------------------------------------
@@ -408,7 +486,7 @@ const fixtures = readdirSync(PICTURES)
   .map((f) => f.replace(/\.tab\.txt$/, ""));
 
 test("there are enough picture fixtures to trust the reader", () => {
-  assert.ok(fixtures.length >= 6, `${fixtures.length} pictures`);
+  assert.ok(fixtures.length >= 7, `${fixtures.length} pictures`);
 });
 
 for (const name of fixtures) {

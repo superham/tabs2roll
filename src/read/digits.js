@@ -271,6 +271,46 @@ const TEMPLATE_ART = [
     ".##.........##..",
     ".#...........#..",
   ] },
+  // Brackets. A note held over from the bar before is written in them, and
+  // they stand right beside the number, on the string, at very nearly its
+  // size. Left out, each one reads as a narrow mark of some sort — most often
+  // a 1 — and a held 7 comes back as three notes, or as the 17th fret.
+  { char: "(", art: [
+    "......##........",
+    ".....##.........",
+    "....##..........",
+    "....##..........",
+    "...##...........",
+    "...##...........",
+    "...##...........",
+    "...##...........",
+    "...##...........",
+    "...##...........",
+    "...##...........",
+    "....##..........",
+    "....##..........",
+    ".....##.........",
+    "......##........",
+    "......##........",
+  ] },
+  { char: ")", art: [
+    "........##......",
+    ".........##.....",
+    "..........##....",
+    "..........##....",
+    "...........##...",
+    "...........##...",
+    "...........##...",
+    "...........##...",
+    "...........##...",
+    "...........##...",
+    "...........##...",
+    "..........##....",
+    "..........##....",
+    ".........##.....",
+    "........##......",
+    "........##......",
+  ] },
   { char: "T", art: [
     ".#############..",
     ".#############..",
@@ -329,12 +369,17 @@ const ASPECT_RANGE = {
   8: [0.42, 0.85],
   9: [0.42, 0.85],
   x: [0.6, 1.1],
+  "(": [0.12, 0.55],
+  ")": [0.12, 0.55],
   T: [0.62, 1.05],
   A: [0.62, 1.1],
 };
 
 /** Characters that are music rather than furniture. */
 export const MUSIC_GLYPHS = "0123456789x";
+
+/** Brackets: not music, not furniture either — they say something about the note beside them. */
+export const BRACKET_GLYPHS = "()";
 
 /** Below this the mark is reported as unreadable instead of guessed at. */
 export const MIN_CONFIDENCE = 0.6;
@@ -594,9 +639,10 @@ function aspectScore(aspect, [low, high]) {
 function holeScore(mark, template) {
   if (mark.count !== template.count) return 0;
   if (!mark.count) return 1;
-  const place = Math.abs(mark.cy - template.cy);
+  const down = Math.abs(mark.cy - template.cy);
+  const across = Math.abs(mark.cx - template.cx);
   const size = Math.abs(mark.area - template.area);
-  return Math.max(0, 1 - place * 2.4 - size * 2.4);
+  return Math.max(0, 1 - down * 2.4 - across * 2.4 - size * 2.4);
 }
 
 /**
@@ -643,4 +689,9 @@ export function classifyGlyph(component, options = {}) {
 /** True for the marks that mean a note: a fret number or a dead stroke. */
 export function isMusicGlyph(char) {
   return typeof char === "string" && MUSIC_GLYPHS.indexOf(char) !== -1;
+}
+
+/** True for a bracket, which is neither a note nor something to complain about. */
+export function isBracketGlyph(char) {
+  return typeof char === "string" && BRACKET_GLYPHS.indexOf(char) !== -1;
 }

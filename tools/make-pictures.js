@@ -28,6 +28,11 @@ const HOW = {
   chords: { spacing: 12, columnWidth: 8, digitHeight: 9, digitWidth: 6 },
   bass: { spacing: 22, columnWidth: 10, digitHeight: 16, digitWidth: 10 },
   "two-staves": { spacing: 11, columnWidth: 6, digitHeight: 9, digitWidth: 5, background: 22, foreground: 236 },
+  // The one drawn the way a real tab player draws: the word TAB down the
+  // front, a time signature, bar numbers, the H and P of hammer-ons and
+  // pull-offs with their slurs, a vibrato squiggle, a note held in brackets,
+  // the rhythm beamed underneath and the player's own cursor across it all.
+  "player-page": { spacing: 13, columnWidth: 9, digitHeight: 10, digitWidth: 6, margin: 46, systemGap: 74, furniture: true },
 };
 
 /** A staff sitting in the middle of a page, the way a screenshot arrives. */

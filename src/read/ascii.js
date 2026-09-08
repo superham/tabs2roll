@@ -61,7 +61,9 @@ export function systemToAscii(system) {
     }
     let widest = 1;
     for (const event of item.column.events) {
-      const text = String(event.fret);
+      // A held note keeps its brackets: written tab means the same thing by
+      // them, and the parser already reads a bracketed fret as a ghost note.
+      const text = event.ghost ? `(${event.fret})` : String(event.fret);
       put(row(rows, event.string), pos, text);
       if (text.length > widest) widest = text.length;
     }

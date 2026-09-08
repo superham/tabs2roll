@@ -134,6 +134,14 @@ Three decisions worth knowing about:
   are counted and reported, both in the popup and by `--show-tab`; the timing still comes
   from the spacing along the page, which is the same guess ASCII tab forces anyway.
 
+Most of what is on a tab player's page is not music — the word TAB down the front of the
+staff, a time signature, bar numbers, the H and P of hammer-ons and pull-offs with their
+slurs, vibrato squiggles, the rhythm beamed underneath, the player's own cursor — and each
+of those is kept out by a rule about where and how big a fret number is, written up in
+[docs/musical-decisions.md](docs/musical-decisions.md). A note held over from the bar
+before, written in brackets, comes through as the ghost note written tab already means by
+`(7)`. `test/fixtures/pictures/player-page.png` has the lot of it in one picture.
+
 A canvas holds the bars that are on screen and no more, so one click reads one screenful of
 a four-minute song. The popup says how much of the score that was and offers to join the
 next screenful onto it.

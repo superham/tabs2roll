@@ -23,6 +23,10 @@ const FONT = {
   T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
+  P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+  "(": ["00100", "01000", "01000", "01000", "01000", "01000", "00100"],
+  ")": ["00100", "00010", "00010", "00010", "00010", "00010", "00100"],
 };
 
 export function createImage(width, height, background = 255) {
@@ -104,9 +108,12 @@ export function renderTab(text, options = {}) {
   const img = createImage(width, height, background);
 
   let top = margin;
+  let staveNumber = 0;
   for (const block of staves) {
     const lineY = block.map((_, i) => top + i * spacing);
     for (const y of lineY) fillRect(img, margin, y, columns * columnWidth, thickness, foreground);
+    if (options.furniture) engrave(img, { block, lineY, spacing, columnWidth, margin, digitHeight, foreground, background, first: staveNumber === 0, bar: staveNumber * 3 + 1 });
+    staveNumber++;
 
     for (let s = 0; s < block.length; s++) {
       const line = block[s];
@@ -141,6 +148,80 @@ function drawNumber(img, text, x, centreY, { digitWidth, digitHeight, background
   for (let i = 0; i < text.length; i++) {
     drawGlyph(img, text[i], left + i * (digitWidth + 1), topY, digitWidth, digitHeight, foreground);
   }
+}
+
+/**
+ * Everything an engraver puts on a staff that is not a note.
+ *
+ * Taken from a real tab player's page: the word TAB written down the front,
+ * a time signature, bar numbers above the staff, the H and P of hammer-ons
+ * and pull-offs with their slurs, a vibrato squiggle, the rhythm drawn as
+ * beams below, and the player's own cursor. None of it is music, and the
+ * reader has to leave all of it alone.
+ */
+export function engrave(img, { block, lineY, spacing, columnWidth, margin, digitHeight, foreground, background, first, bar }) {
+  const top = lineY[0];
+  const bottom = lineY[lineY.length - 1];
+  const width = columnWidth * Math.max(...block.map((l) => l.length));
+
+  if (first) {
+    // "TAB" down the front, half again as tall as a fret number — close
+    // enough to one that only its size gives it away.
+    const letter = Math.round(digitHeight * 1.5);
+    const span = bottom - top;
+    ["T", "A", "B"].forEach((ch, i) => {
+      drawGlyph(img, ch, margin + 4, top + Math.round((i * (span - letter)) / 2), Math.round(letter * 0.7), letter, foreground);
+    });
+    // ...and a time signature, bigger again.
+    const sig = Math.round(spacing * 2);
+    drawGlyph(img, "4", margin + 22, top + 1, Math.round(sig * 0.62), sig, foreground);
+    drawGlyph(img, "4", margin + 22, top + sig + 2, Math.round(sig * 0.62), sig, foreground);
+    // The player's cursor: a bar of colour across the staff, mid-grey once
+    // the picture is read as brightness.
+    fillRect(img, margin + 44, top - 4, 2, bottom - top + 8, 110);
+  }
+
+  // Bar numbers, small, above the staff and to the left of each bar line.
+  const small = Math.max(4, Math.round(digitHeight * 0.7));
+  let number = bar;
+  drawGlyph(img, String(number % 10), margin, top - spacing - small, Math.round(small * 0.62), small, foreground);
+  for (let c = 0; c < block[0].length; c++) {
+    if (block.every((line) => line[c] !== "|")) continue;
+    number++;
+    drawGlyph(img, String(number % 10), margin + c * columnWidth + 2, top - spacing - small, Math.round(small * 0.62), small, foreground);
+  }
+
+  // H and P over the notes, with the slur that joins them: long shallow arcs
+  // a whisker above the string, near enough to be taken for sitting on it.
+  const letters = Math.round(digitHeight * 0.9);
+  for (let i = 0; i < 4; i++) {
+    const x = margin + Math.round(width * (0.18 + i * 0.2));
+    drawGlyph(img, i % 2 ? "P" : "H", x, top - spacing - letters, Math.round(letters * 0.7), letters, foreground);
+    // Clear of the numbers: an engraver leaves a gap, and a slur drawn
+    // through a fret number would be one mark with it, not two.
+    for (let dx = 0; dx < 34; dx++) {
+      const y = top - Math.round(spacing * 0.62) - Math.round(Math.sin((dx / 34) * Math.PI) * 4);
+      fillRect(img, x + dx, y, 1, 1, foreground);
+    }
+  }
+
+  // A vibrato squiggle above the staff.
+  for (let dx = 0; dx < 40; dx++) {
+    fillRect(img, margin + Math.round(width * 0.62) + dx, top - spacing - 2 + (dx % 4 < 2 ? 0 : 2), 1, 1, foreground);
+  }
+
+  // The rhythm, drawn below the staff: stems hanging off two beams, with the
+  // bracket and the little 3 of a triplet under them.
+  const beam = bottom + Math.round(spacing * 1.4);
+  for (let i = 0; i < 10; i++) {
+    const x = margin + Math.round((width * (i + 1)) / 12);
+    fillRect(img, x, bottom + 4, 1, beam - bottom - 4, foreground);
+    if (i % 2 === 0) fillRect(img, x, beam, Math.round(width / 12), 2, foreground);
+  }
+  const bracket = beam + Math.round(spacing * 0.6);
+  fillRect(img, margin + 20, bracket, 30, 1, foreground);
+  drawGlyph(img, "3", margin + 32, bracket + 2, Math.round(small * 0.62), small, foreground);
+  void background;
 }
 
 /** Turn a picture into something a person can read in a test failure. */
