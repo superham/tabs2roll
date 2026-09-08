@@ -7,10 +7,45 @@ import * as shape from "../src/parse/tabshape.js";
 import { extractUltimateGuitar, parseUltimateGuitarTitle, findInJson, isUltimateGuitarHost } from "../src/extract/sites/ultimate-guitar.js";
 import { extractGeneric, cleanPageTitle, isPlayerOnlyHost } from "../src/extract/sites/generic.js";
 import { extractFromPage, describePage } from "../src/extract/sites/page.js";
+import { findScoreImages } from "../src/extract/sites/score-canvas.js";
+import { renderTab } from "./helpers/draw.js";
 import { buildInjected, OUTPUT } from "../tools/build-injected.js";
 
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
-const sites = { ultimateGuitar: extractUltimateGuitar, generic: extractGeneric };
+const sites = { ultimateGuitar: extractUltimateGuitar, generic: extractGeneric, scoreCanvas: findScoreImages };
+
+/**
+ * A <canvas> with something painted on it, of the shape the extractor uses:
+ * width and height, a 2d context that hands back RGBA, and a parent that
+ * scrolls. `picture` is grey, one byte a pixel.
+ */
+function canvas(picture, { scroll = null, refuses = false, webgl = false } = {}) {
+  const node = el("canvas", {});
+  node.width = picture.width;
+  node.height = picture.height;
+  node.getContext = (kind) => {
+    if (kind !== "2d" || webgl) return null;
+    return {
+      getImageData(x, y, w, h) {
+        // A canvas holding pixels from another site throws instead of answering.
+        if (refuses) throw new Error("The operation is insecure.");
+        const data = new Uint8ClampedArray(w * h * 4);
+        for (let i = 0; i < w * h; i++) {
+          const v = picture.gray[i];
+          data[i * 4] = v;
+          data[i * 4 + 1] = v;
+          data[i * 4 + 2] = v;
+          data[i * 4 + 3] = 255;
+        }
+        return { data, width: w, height: h };
+      },
+    };
+  };
+  node.parentElement = scroll ? { scrollTop: scroll.top, scrollHeight: scroll.height, clientHeight: scroll.visible, parentElement: null } : null;
+  return node;
+}
+
+const DRAWN_TAB = ["|--0--2--3--2--|--0--------|", "|--------------|--1--------|", "|--------------|--0--------|", "|--2--2--2--2--|--2--------|", "|--------------|--3--------|", "|--3-----------|-----------|"].join("\n");
 
 test("generic: strategy 2 — <pre> blocks that look like tab, joined in page order", () => {
   const doc = document({
@@ -205,4 +240,83 @@ test("a successful extraction reports the running build", () => {
   assert.equal(result.ok, true);
   assert.match(result.seen.build, /^[0-9a-f]{8}$/);
 
+});
+
+// --------------------------------------------------------------------------
+// Pages that draw their tab instead of writing it
+// --------------------------------------------------------------------------
+
+test("findScoreImages: a canvas with music on it comes back as pixels", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({ hostname: "tabs.ultimate-guitar.com", title: "(1) OFFICIAL THE TROOPER CHORDS & TABS by Iron Maiden @ Ultimate-Guitar.Com", body: [el("div", {}, [canvas(picture, { scroll: { top: 0, height: 8133, visible: 887 } })])] });
+  const [found, ...rest] = findScoreImages(doc);
+  assert.equal(rest.length, 0);
+  assert.equal(found.width, picture.width);
+  assert.equal(found.height, picture.height);
+  assert.equal(found.gray.length, picture.width * picture.height);
+  assert.ok(found.content > 0.002 && found.content < 0.5, `${found.content} of it should be ink`);
+  // How much of the score was on screen, so the popup can say so.
+  assert.deepEqual(found.scroll, { top: 0, height: 8133, visible: 887 });
+});
+
+test("findScoreImages: icons, blank overlays and canvases it may not read are skipped", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const tiny = { width: 40, height: 40, gray: new Uint8Array(1600).fill(0) };
+  const blank = { width: 400, height: 300, gray: new Uint8Array(120000).fill(255) };
+  const doc = document({
+    body: [
+      el("div", {}, [
+        canvas(tiny), // an avatar or a tuner dial
+        canvas(blank), // the playing-cursor layer, painted on only while playing
+        canvas(picture, { refuses: true }), // pixels from another site
+        canvas(picture, { webgl: true }), // not a 2d canvas at all
+        canvas(picture),
+      ]),
+    ],
+  });
+  const found = findScoreImages(doc);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].width, picture.width);
+});
+
+test("extractFromPage: a page with no text but a score on a canvas hands back the pixels", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({
+    hostname: "tabs.ultimate-guitar.com",
+    title: "(1) OFFICIAL THE TROOPER CHORDS & TABS by Iron Maiden @ Ultimate-Guitar.Com",
+    body: [el("h1", {}, ["Official The Trooper Tab"]), el("div", {}, [canvas(picture)])],
+  });
+  const r = extractFromPage(doc, shape, sites);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "unsupported");
+  assert.equal(r.score.length, 1);
+  assert.equal(r.seen.canvases, 1);
+  // The song's name still comes off the page, even though its notes did not.
+  assert.equal(r.title, "The Trooper");
+  assert.equal(r.artist, "Iron Maiden");
+});
+
+test("extractFromPage: a page whose tab is text is never asked for its pixels", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({ title: "Greensleeves Tab", body: [el("pre", {}, [TAB]), el("div", {}, [canvas(picture)])] });
+  const r = extractFromPage(doc, shape, sites);
+  assert.equal(r.ok, true);
+  assert.equal(r.score, undefined, "copying a megabyte of pixels off a page that gave us the text is pure waste");
+});
+
+test("extractFromPage: a page with neither text nor a canvas is unchanged", () => {
+  const r = extractFromPage(document({ body: [el("p", {}, ["nothing here"])] }), shape, sites);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "none");
+  assert.equal(r.score, undefined);
+  assert.equal(r.seen.canvases, 0);
+});
+
+test("the page title of a real Official tab is read the way the site writes it", () => {
+  // Straight off tabs.ultimate-guitar.com: an unread-messages count in front,
+  // "CHORDS & TABS" rather than "TAB", and the word "OFFICIAL" sitting inside
+  // the song's name. All three used to make this hand back nothing at all, so
+  // an Official page lost its song title as well as its notes.
+  const real = parseUltimateGuitarTitle("(1) OFFICIAL THE TROOPER CHORDS & TABS by Iron Maiden @ Ultimate-Guitar.Com");
+  assert.deepEqual(real, { title: "The Trooper", artist: "Iron Maiden", type: "official" });
 });

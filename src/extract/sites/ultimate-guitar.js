@@ -40,11 +40,28 @@ export function findInJson(root, key, maxDepth) {
   return null;
 }
 
-/** "GREENSLEEVES TAB by Traditional @ Ultimate-Guitar.Com" -> { title, artist, type } */
+/**
+ * "GREENSLEEVES TAB by Traditional @ Ultimate-Guitar.Com" -> { title, artist, type }
+ *
+ * Three things in a real page title that are not in that example, all of
+ * which used to make this give up and hand back nothing at all:
+ *   "(1) ..."          an unread-messages count, prepended by the site
+ *   "CHORDS & TABS"    what the Official (player) pages call themselves
+ *   "OFFICIAL ..."     the word that says it IS one, sitting in the song name
+ */
 export function parseUltimateGuitarTitle(pageTitle) {
-  const m = /^(.*?)\s+(BASS TAB|BASS|UKULELE CHORDS|UKULELE|GUITAR PRO|POWER TAB|OFFICIAL|CHORDS|TAB|DRUM TAB|DRUMS|VIDEO)\s+by\s+(.*?)\s*(?:@|\||$)/i.exec(String(pageTitle || ""));
+  const cleaned = String(pageTitle || "").replace(/^\s*\(\d+\)\s*/, "");
+  const m = /^(.*?)\s+(BASS TABS?|BASS|UKULELE CHORDS|UKULELE|GUITAR PRO|POWER TABS?|OFFICIAL|CHORDS\s*(?:&|AND)\s*TABS?|CHORDS|TABS?|DRUM TABS?|DRUMS|VIDEO)\s+by\s+(.*?)\s*(?:@|\||$)/i.exec(cleaned);
   if (!m) return null;
-  return { title: titleCase(m[1]), artist: titleCase(m[3]), type: m[2].toLowerCase() };
+  let title = titleCase(m[1]);
+  let type = m[2].toLowerCase().replace(/\s+/g, " ");
+  // "Official The Trooper" is the song "The Trooper" on a player-only page.
+  const official = /^official\s+(.+)$/i.exec(title);
+  if (official) {
+    title = official[1];
+    type = "official";
+  }
+  return { title, artist: titleCase(m[3]), type };
 }
 
 function titleCase(s) {
@@ -75,7 +92,7 @@ export function extractUltimateGuitar(doc, shape) {
     const meta = findInJson(json, "wiki_tab");
     const type = tabInfo && typeof tabInfo.type === "string" ? tabInfo.type.toLowerCase() : fromTitle.type || "";
     if (type && UG_UNSUPPORTED_TYPES.some((t) => type.indexOf(t) !== -1)) {
-      return { ok: false, reason: "unsupported", site: "ultimate-guitar", type };
+      return { ...base, ok: false, reason: "unsupported", type };
     }
     const content = meta && meta.wiki_tab && typeof meta.wiki_tab.content === "string" ? meta.wiki_tab.content : null;
     if (content && (shape.looksLikeSong(content) || type.indexOf("chord") !== -1 || /\[ch\]/.test(content))) {
@@ -96,9 +113,12 @@ export function extractUltimateGuitar(doc, shape) {
     }
   }
 
-  // The page told us (in its title) that this is a player-only tab.
+  // The page told us (in its title) that this is a player-only tab. The song
+  // and artist go back with that: its notes may be out of reach as text, but
+  // it is still a named song, and a picture read off the player needs a name
+  // to be saved under.
   if (fromTitle.type && UG_UNSUPPORTED_TYPES.some((t) => fromTitle.type.indexOf(t) !== -1)) {
-    return { ok: false, reason: "unsupported", site: "ultimate-guitar", type: fromTitle.type };
+    return { ...base, ok: false, reason: "unsupported", type: fromTitle.type };
   }
   // Nothing from the store: let the generic extractor read the rendered DOM,
   // but keep the song title and artist we got from the page title.

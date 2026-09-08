@@ -8,6 +8,11 @@ standard MIDI file you can open in your DAW.
 - Works on Ultimate Guitar and on any page that shows tab or chords as text, including
   modern chord pages that print the chord names above (or on their own line before) the
   words. If a page can't be read, paste the text into the popup instead.
+- **Reads tab that is drawn rather than written.** The "Official" and "Pro" tabs and the
+  interactive players paint the music onto a canvas — there is no tab text on those pages
+  at all — so tab2roll reads the picture: it finds the strings, reads the fret numbers off
+  them and shows you the tab it made before saving anything. Drop or paste a screenshot or
+  a photo of a page and it does the same.
 - Reads the song out of the page and leaves the rest behind: navigation, the
   chord-diagram legend, comments and the A-Z artist index never become bars of music.
 - Makes up to four tracks: the guitar exactly as tabbed, plus chords, bass and lead
@@ -39,16 +44,22 @@ install and shows how to pin the toolbar button.
 ```sh
 node tools/convert.js test/fixtures/ode-to-joy.txt out.mid
 node tools/convert.js my-tab.txt --tuning drop-d --step 1/16 --notes
+node tools/convert.js screenshot.png out.mid --show-tab
 ```
 
 This is how the parser was developed and verified before any browser code existed; it
 prints a summary (title, tuning, tracks, timing step) and with `--notes` every note.
+
+Hand it a PNG and it reads the sheet music off it first, exactly as the extension does,
+reporting how sure it is; `--show-tab` prints the tab it made of the picture.
 
 ## How it works
 
 ```
 src/
   extract/      DOM  -> raw tab text        runs inside the page; site-specific
+                DOM  -> pixels              score-canvas.js, for pages that draw it
+  read/         picture -> ASCII tab text   pure, no DOM (see below)
   parse/        text -> IR                  pure, no DOM, no browser APIs
     region.js   whole page -> just the song (see below)
   arrange/      IR   -> IR + chord/bass/lead pure
@@ -56,12 +67,17 @@ src/
   pipeline.js   the three above in one call (used by the CLI and the extension)
   background.js event page: runs the pipeline, saves the file, opens onboarding
   ui/           popup, onboarding, help and settings pages (plain HTML + JS)
+    picture.js  the popup's side of reading a picture
   strings.js    every user-facing string
 test/
   fixtures/     tab texts + golden files (see test/fixtures/README.md)
+    pictures/   PNGs of tab + the tab each was drawn from
+  helpers/draw.js  draws tablature, in a digit face the reader has never seen
 tools/
-  convert.js    CLI
+  convert.js    CLI (text or PNG in, MIDI out)
+  png.js        a PNG reader, so the CLI can be pointed at a screenshot
   build-injected.js  builds the one script that runs inside web pages
+  make-pictures.js   draws the picture fixtures
   update-goldens.js  regenerates the golden files
 ```
 
@@ -79,6 +95,48 @@ ES modules while the injected script stays a single self-contained, import-free
 function. It reads the DOM and returns plain data; it injects no UI, keeps no state and
 never touches the network. The generated file is committed so a checkout loads without
 a build; `npm test` fails if it is stale.
+
+### Reading sheet music
+
+An "Official" or "Pro" tab page has no tab text on it anywhere — not in the DOM, not in a
+script tag, not in an attribute. The music is painted onto a `<canvas>`, so the notes exist
+only as pixels. `src/read/` reads them:
+
+```
+picture -> ink            image.js   grey, then black and white, either way up
+        -> staves         staff.js   the long even lines, and how they group
+        -> marks          glyphs.js  lines rubbed out, what is left picked up
+        -> digits         digits.js  which mark is which
+        -> notes and bars score.js   which string, which fret, played together?
+        -> tab text       ascii.js
+```
+
+The last step is the point of the design: the reader's job ends when the picture has become
+the same ASCII tab a person would have pasted in. Everything downstream — the timing
+guesses, the tunings, the arranger, the MIDI encoder — is the code that was already there
+and already tested. It is also what the user sees, because a picture read slightly wrong is
+a mystery until you can look at it, and a 7 that should be a 1 takes five seconds to fix in
+a box of dashes.
+
+Three decisions worth knowing about:
+
+- **Tablature only.** Fret numbers on strings, four to seven of them. An ordinary five-line
+  stave is recognised as notation and reported as such rather than guessed at: pitches from
+  noteheads, clefs, key signatures and accidentals is a different problem, and a wrong
+  answer would be worse than an honest "I can't read this".
+- **No machine learning, no dependencies.** A printed digit is one of the most constrained
+  shapes there is: ten possibilities, upright, at a known size. Four measurements settle it
+  — how far the strokes sit from a drawn letterform in `digits.js`, where the strokes fall
+  band by band, how many holes it has, and how wide it is for its height. `npm test` reads
+  every digit at eight sizes and three widths in a face those letterforms deliberately do
+  not match.
+- **What it will not do.** It never says a note it is unsure of. Marks it cannot make out
+  are counted and reported, both in the popup and by `--show-tab`; the timing still comes
+  from the spacing along the page, which is the same guess ASCII tab forces anyway.
+
+A canvas holds the bars that are on screen and no more, so one click reads one screenful of
+a four-minute song. The popup says how much of the score that was and offers to join the
+next screenful onto it.
 
 ### When a real page does not work
 
@@ -187,6 +245,11 @@ extension's own `localStorage`, which needs no permission.
 - **A capo transposes chord sheets too**, not just tabs. Chord sheets name the shape the
   player holds, so a capo on fret 1 means a written G sounds as Ab, and the file should
   match the record rather than the shapes.
+- **A picture becomes text, not notes.** Reading sheet music stops at ASCII tab and hands it
+  to the parser that was already there. It costs a little accuracy — the text cannot hold
+  anything the parser could not have been told anyway — and it buys the whole existing
+  pipeline, a golden-file test for every picture, and a user who can see and correct what
+  was read.
 
 ## License
 

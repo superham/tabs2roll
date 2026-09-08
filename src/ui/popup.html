@@ -21,6 +21,9 @@
       <section id="view-found" class="view" hidden>
         <p class="found-label" id="found-label"></p>
         <p class="song-title" id="song-title"></p>
+        <p class="small" id="picture-note" hidden></p>
+        <p class="small muted" id="picture-partial" hidden></p>
+        <button id="picture-join" class="secondary" type="button" hidden data-str="popup.pictureAdd"></button>
       </section>
 
       <!-- Nothing readable on this page -->
@@ -66,6 +69,7 @@
         <div id="paste-body" hidden>
           <textarea id="paste-text" rows="7" spellcheck="false" data-str="popup.pastePlaceholder" data-str-attr="placeholder"></textarea>
           <p class="small" id="paste-status"></p>
+          <p class="small muted" id="drop-hint" data-str="popup.dropPicture"></p>
         </div>
       </section>
     </main>

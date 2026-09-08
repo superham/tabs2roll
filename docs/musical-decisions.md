@@ -131,6 +131,45 @@ Song metadata is still read from the **whole** page, because `Tuning: Drop D`,
   in the aligned case is the obvious next improvement; the layouts are told apart by
   whether any line holds two or more chords.
 
+## Reading sheet music (`src/read/`)
+
+A tab drawn as a picture — an "Official" or "Pro" page, a screenshot of a player, a photo
+of a songbook — is turned into ASCII tab and then handed to the parser above. Everything
+here is measured in **staff spacings**, never in pixels, so one set of rules covers a phone
+screenshot and a print-resolution scan.
+
+| What | Constant | Value | Why |
+|---|---|---|---|
+| Staff line | `MIN_RUN_SHARE`, `MIN_COVERAGE` | a run at least a quarter as long as the longest in the picture, of which at least 45% is ink | Bridging the holes rubbed out behind fret numbers is what makes a tab line readable at all; the coverage test is what stops the bridging believing in a "line" through the middles of eight numbers, which sits at exactly a staff's spacing because the numbers sit on the strings. |
+| Line thickness | `MAX_LINE_THICKNESS` | at most 6px, or 2% of the picture | A staff line is a hairline. A navigation bar read as one puts a phantom string through the staff. |
+| Staff size | 4-8 lines, even spacing | 6 = guitar, 4 = bass, 7 = extended range | Five is the ambiguous one: a notation stave, or a five-string bass. There the numbers decide. |
+| Fret number | `MIN_GLYPH_HEIGHT` 0.34, `MAX_GLYPH_HEIGHT` 1.45 spacings, and no more than 1.6x the staff's own median | | Rules out staccato dots and slur tips below, time signatures and clefs above. The median is measured per staff because every score is drawn at its own scale. |
+| On a string | `ON_STRING` | within 0.42 spacings of a line | A fret number sits on its string. "P.M.", "let ring" and section names do not. |
+| Two-digit frets | `DIGIT_JOIN` 0.6 of a digit height, first digit 1 or 2, result ≤ 24 | | A two-digit fret is set almost solid where two notes are a beat apart; and nobody writes "04", so most of the ways two close notes could run together are ruled out. |
+| A chord | `SAME_COLUMN` | numbers whose middles are within 0.45 spacings | Generous enough to hold a chord where a 24 is drawn wider than a 4 and so does not have its middle in quite the same place. |
+| Bar line | `BAR_MAX_WIDTH` 0.3 spacings wide, `BAR_MIN_HEIGHT` 0.76 of the staff | | Spans the staff; a rhythm stem below it does not. |
+| Timing | `CHARS_PER_GAP` = 3 | the gap between two numbers on the page becomes dashes in proportion, the smallest gap being three | Engraved music is laid out along the page roughly in proportion to time, so the spacing really does carry the rhythm — and three characters is what `parse/tab.js` assumes a step is when nothing else says. Stems, flags and beams are **not** read. |
+
+Which digit a mark is comes from four measurements, weighted (`src/read/digits.js`):
+
+| Measurement | Weight | What it is |
+|---|---|---|
+| Shape | 0.40 | How far the mark's strokes are from a drawn letterform's, and the letterform's from the mark's, both ways. Mostly the **worst-fitting tenth** rather than the average: a 5 laid over a 3 agrees everywhere except the stem down its left, and an average buries exactly the thing that names it. |
+| Strokes | 0.30 | On each of eight bands down the mark, how many strokes cross it and how far left and right they reach. Survives blurring and small sizes. |
+| Holes | 0.12 | None in a 1, one in a 0, two in an 8 — and where the hole sits, which is the whole difference between a 0, a 6 and a 9. |
+| Width for height | 0.18 | A range per character, not a number: it rules shapes out rather than picking the winner. |
+
+A mark is compared **stretched** to a square, not scaled: how wide a digit is drawn is
+already measured on its own, and leaving it in the shape as well makes a condensed 5 fit a
+3 better than it fits a 5.
+
+Below `MIN_CONFIDENCE` (0.6), or with a shape score under `MIN_SHAPE` (0.5), the mark is
+reported as unreadable rather than guessed at — and so is a mark that reads as a letter,
+because an 8 and a B are the same shape with the corners squared off and a note quietly
+dropped as furniture is worse than one the user is told to check. The letterforms the
+reader knows are deliberately few (T and A, for the word written down the front of a tab
+staff): a letter earns its place there only when it cannot be mistaken for a digit.
+
 ## Arranging (`src/arrange/index.js`)
 
 | What | Constant | Value | Why |

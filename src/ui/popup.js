@@ -4,9 +4,10 @@
 // Every user-facing string comes from src/strings.js. Real errors go to the
 // console; the user only ever sees plain language plus what to do next.
 
-import { fillStrings, browser, getOptions, getLastResult, setLastResult, openPage, getVersion, STRINGS } from "./common.js";
+import { fillStrings, browser, getOptions, getLastResult, setLastResult, getPictureRead, setPictureRead, openPage, getVersion, STRINGS } from "./common.js";
 import { detect } from "../parse/index.js";
 import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
+import { imageDataFromFile, imageFileOf, readBestPicture, coverageOf } from "./picture.js";
 
 const P = STRINGS.popup;
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,8 @@ const state = {
   pasteKind: "none", // detect() of the paste box
   busy: false,
   lastConversion: null, // { text, meta, options } for "Wrong tuning? Re-do as:"
+  reading: null, // what came back from reading a picture of the music
+  earlier: null, // an earlier picture read of this same page, to join onto
 };
 
 // --------------------------------------------------------------------------
@@ -76,15 +79,48 @@ function displayTitle(page) {
   return title || artist || P.foundUntitled;
 }
 
+/**
+ * What to say about a picture that could not be read.
+ *
+ * Each answer names the thing that went wrong and what to do about it. "This
+ * page is a picture" is not something the user can act on; "make the page
+ * bigger and click again" is, and it usually works, because everything in
+ * here gets easier the larger the numbers are drawn.
+ */
+function pictureProblem(reading) {
+  if (!reading) return P.unsupported;
+  if (reading.reason === "notation-only") return P.pictureNotation;
+  if (reading.reason === "no-staves" || reading.reason === "blank") return P.pictureNoStaves;
+  return P.pictureNothing;
+}
+
+function renderPicturePanel() {
+  const reading = state.reading;
+  const note = $("picture-note");
+  const partial = $("picture-partial");
+  const join = $("picture-join");
+  const showing = !!(state.page && state.page.fromPicture && reading);
+  note.hidden = !showing;
+  partial.hidden = !showing;
+  join.hidden = !(showing && state.earlier);
+  if (!showing) return;
+  note.textContent = `${P.pictureNotes(reading.notes)} ${reading.unreadable ? P.pictureUnsure : P.pictureCheck}`;
+  const percent = coverageOf(reading.scroll);
+  partial.hidden = percent === null;
+  if (percent !== null) partial.textContent = P.picturePartial(percent);
+}
+
 function renderPageState() {
   if (state.page) {
     show("view-found");
-    $("found-label").textContent = state.page.kind === "chords" ? P.foundChords : P.foundTab;
+    $("found-label").textContent = state.page.fromPicture ? P.foundPicture : state.page.kind === "chords" ? P.foundChords : P.foundTab;
     $("song-title").textContent = displayTitle(state.page);
+    renderPicturePanel();
     setMainVisible(true);
+    if (state.page.fromPicture) setPasteOpen(true);
   } else {
     show("view-notfound");
-    $("notfound-message").textContent = state.pageReason === "unsupported" ? P.unsupported : P.notFound;
+    $("notfound-message").textContent = state.pageReason === "picture" ? pictureProblem(state.reading) : state.pageReason === "unsupported" ? P.unsupported : P.notFound;
     setMainVisible(hasPaste()); // never a dead button: it appears once there is something to send
     setPasteOpen(true);
   }
@@ -240,10 +276,36 @@ async function lookAtPage() {
     state.pageReason = "none";
     return;
   }
-  if (result && result.reason) {
-    state.pageReason = result.reason === "unsupported" ? "unsupported" : "none";
-    if (result.reason === "error") console.error("[tab2roll] extractor failed inside the page:", result.message);
+  if (result && result.reason === "error") console.error("[tab2roll] extractor failed inside the page:", result.message);
+
+  // No text anywhere on the page. If it draws the music instead — a tab
+  // player, a score on a canvas — read the picture.
+  if (result && Array.isArray(result.score) && result.score.length) {
+    readPagePicture(result);
+    return;
   }
+  if (result && result.reason) state.pageReason = result.reason === "unsupported" ? "unsupported" : "none";
+}
+
+/** Read the picture(s) the page gave us and, if there is music in them, use it. */
+function readPagePicture(result) {
+  const reading = readBestPicture(result.score);
+  state.reading = reading;
+  state.pageReason = "picture";
+  console.log("[tab2roll] read the picture:", reading ? { ok: reading.ok, reason: reading.reason, staves: reading.staves, strings: reading.strings, notes: reading.notes, bars: reading.bars, unreadable: reading.unreadable, confidence: reading.confidence } : "nothing readable");
+  if (!reading || !reading.ok) return;
+  state.earlier = state.tab ? getPictureRead(state.tab.url) : null;
+  if (state.earlier && state.earlier.text === reading.text) state.earlier = null;
+  state.page = {
+    ...result,
+    ok: true,
+    text: reading.text,
+    kind: "tab",
+    fromPicture: true,
+    site: result.site || "picture",
+  };
+  setPasteText(reading.text);
+  if (state.tab) setPictureRead({ url: state.tab.url, text: reading.text });
 }
 
 // --------------------------------------------------------------------------
@@ -283,20 +345,28 @@ async function convert({ text, meta, options }) {
   }
 }
 
+function pageMeta() {
+  if (!state.page) return { source: "paste" };
+  return {
+    source: state.page.site || "generic",
+    title: state.page.title || "",
+    artist: state.page.artist || "",
+    tuning: typeof state.page.tuning === "string" ? state.page.tuning : "",
+    capo: typeof state.page.capo === "number" ? state.page.capo : undefined,
+  };
+}
+
 async function onMainClick() {
   if (state.busy) return;
   const usePaste = hasPaste();
   if (!usePaste && !state.page) return;
   const text = usePaste ? $("paste-text").value : state.page.text;
-  const meta = usePaste
-    ? { source: "paste" }
-    : {
-        source: state.page.site || "generic",
-        title: state.page.title || "",
-        artist: state.page.artist || "",
-        tuning: typeof state.page.tuning === "string" ? state.page.tuning : "",
-        capo: typeof state.page.capo === "number" ? state.page.capo : undefined,
-      };
+  // Tab read off a picture of the page sits in the paste box so it can be
+  // checked and corrected, but it is still this page's song: keep its title,
+  // artist and tuning rather than treating it as text from nowhere.
+  const fromPage = state.page && state.page.fromPicture;
+  const meta = usePaste && !fromPage ? { source: "paste" } : pageMeta();
+  if (fromPage && state.tab) setPictureRead({ url: state.tab.url, text });
   await convert({ text, meta, options: currentOptions() });
 }
 
@@ -307,6 +377,67 @@ async function onTuningChange() {
   const label = (STRINGS.tunings[id] || id).replace(/\s*\(.*\)$/, "");
   $("redo-status").hidden = false;
   await convert({ text, meta, options: { ...options, tuningId: id, filenameSuffix: label } });
+}
+
+/** Put text in the paste box and tell the rest of the popup about it. */
+function setPasteText(text) {
+  $("paste-text").value = text;
+  onPasteInput();
+}
+
+/**
+ * A picture dropped or pasted into the popup.
+ *
+ * The same reader as the page's own canvas, so a screenshot of any tab
+ * player, a photo of a songbook or a page out of a chord chart all work the
+ * same way and all land in the same box for checking.
+ */
+async function readDroppedPicture(file) {
+  const status = $("paste-status");
+  status.textContent = P.dropReading;
+  setPasteOpen(true);
+  // Let the message paint before the reading starts: it is all one long
+  // stretch of arithmetic, and the popup cannot redraw in the middle of it.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  let reading = null;
+  try {
+    reading = readBestPicture([await imageDataFromFile(file)]);
+  } catch (err) {
+    console.error("[tab2roll] could not read that picture", err);
+  }
+  if (!reading || !reading.ok) {
+    status.textContent = reading ? pictureProblem(reading) : P.dropFailed;
+    return;
+  }
+  state.reading = reading;
+  const existing = $("paste-text").value.trim();
+  setPasteText(existing ? `${existing}\n\n${reading.text}` : reading.text);
+  status.textContent = `${P.pictureNotes(reading.notes)} ${reading.unreadable ? P.pictureUnsure : P.pictureCheck}`;
+}
+
+function onDrop(event) {
+  const file = imageFileOf(event.dataTransfer);
+  if (!file) return;
+  event.preventDefault();
+  readDroppedPicture(file);
+}
+
+function onPasteEvent(event) {
+  const file = imageFileOf(event.clipboardData);
+  if (!file) return;
+  event.preventDefault();
+  readDroppedPicture(file);
+}
+
+/** Join this screenful onto the one read before it. */
+function onPictureJoin() {
+  if (!state.earlier) return;
+  const now = $("paste-text").value.trim();
+  setPasteText(`${state.earlier.text.trim()}\n\n${now}`);
+  state.earlier = null;
+  $("picture-join").hidden = true;
+  $("paste-status").textContent = P.pictureAdded;
+  if (state.tab) setPictureRead({ url: state.tab.url, text: $("paste-text").value });
 }
 
 function onPasteInput() {
@@ -346,6 +477,10 @@ function wireEvents() {
   $("convert-another").addEventListener("click", onConvertAnother);
   $("paste-toggle").addEventListener("click", () => setPasteOpen($("paste-body").hidden));
   $("paste-text").addEventListener("input", onPasteInput);
+  $("picture-join").addEventListener("click", onPictureJoin);
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", onDrop);
+  document.addEventListener("paste", onPasteEvent);
   $("show-me-how").addEventListener("click", (e) => {
     e.preventDefault();
     openPage("ui/help.html#fl-studio");
