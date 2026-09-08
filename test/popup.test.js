@@ -13,6 +13,7 @@ import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STRINGS } from "../src/strings.js";
+import { renderTab } from "./helpers/draw.js";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
@@ -58,7 +59,7 @@ const STUB = (scenario) => `
     runtime: {
       id: "test",
       getURL: (p) => "/" + p,
-      getManifest: () => ({ version: "0.1.7" }),
+      getManifest: () => ({ version: "0.2.0" }),
       sendMessage: async (msg) => { calls.push(["sendMessage", msg]); return scenario.reply; },
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
@@ -124,7 +125,7 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(await text(page, "#main-button .label"), "Send to my DAW");
     assert.equal(await visible(page, "#paste-body"), false);
     // The installed version is shown so a stale add-on is obvious at a glance.
-    assert.equal(await text(page, "#version"), "Version 0.1.7");
+    assert.equal(await text(page, "#version"), "Version 0.2.0");
 
     await page.click("#main-button");
     await page.waitForSelector("#view-success:not([hidden])");
@@ -268,6 +269,58 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     const other = await open({ url: "https://example.com/other", extract: { ok: true, site: "generic", text: TAB, title: "X", artist: "" }, reply: null }, { localStorage: { "tab2roll:lastResult": JSON.stringify(last) } });
     assert.equal(await visible(other.page, "#view-found"), true);
     assert.deepEqual(errors.concat(c.errors, other.errors), []);
+  });
+
+  await t.test("a page that draws its tab is read off the screen", async () => {
+    // The Ultimate Guitar "Official" tabs, and every other interactive tab
+    // player: no tab text anywhere in the page, just a canvas with the music
+    // painted on it. The extractor hands back the pixels; the popup reads
+    // them and puts what it made of them in the paste box, where they can be
+    // checked before being sent.
+    const drawn = ["|--0--2--3--2--|--0--------|", "|--------------|--1--------|", "|--------------|--0--------|", "|--2--2--2--2--|--2--------|", "|--------------|--3--------|", "|--3-----------|-----------|"].join("\n");
+    const picture = renderTab(drawn, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+    const score = [{ width: picture.width, height: picture.height, gray: Array.from(picture.gray), scroll: { top: 0, height: 4000, visible: 500 } }];
+    const reply = { ok: true, filename: "Iron Maiden - The Trooper (tab).mid", kind: "tab", rhythmSource: "guessed", tuningId: "standard", tracks: ["Guitar (as tabbed)"], title: "The Trooper" };
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/iron-maiden/the-trooper-official-1935205",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", title: "The Trooper", artist: "Iron Maiden", score },
+      reply,
+    });
+
+    assert.equal(await visible(page, "#view-found"), true);
+    assert.equal(await text(page, "#found-label"), STRINGS.popup.foundPicture);
+    assert.equal(await text(page, "#song-title"), "The Trooper — Iron Maiden");
+    // The tab it read is shown, not hidden: a picture read slightly wrong is
+    // a mystery until you can see it.
+    assert.equal(await visible(page, "#paste-body"), true);
+    const box = await page.$eval("#paste-text", (el) => el.value);
+    assert.match(box, /^\|[-0-9|]+$/m);
+    assert.equal(box.split("\n").length, 6);
+    assert.ok((await text(page, "#picture-note")).includes("read off the picture"));
+    // The canvas held one screenful of a long song, and says so.
+    assert.equal(await visible(page, "#picture-partial"), true);
+    assert.match(await text(page, "#picture-partial"), /scroll/i);
+
+    await page.click("#main-button");
+    await page.waitForSelector("#view-success:not([hidden])");
+    const sent = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "sendMessage")[1];
+    // It came out of the paste box, but it is still this page's song.
+    assert.equal(sent.text, box);
+    assert.equal(sent.meta.source, "ultimate-guitar");
+    assert.equal(sent.meta.title, "The Trooper");
+    assert.equal(sent.meta.artist, "Iron Maiden");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a page that draws something with no tab in it says so plainly", async () => {
+    const blank = { width: 300, height: 200, gray: Array.from(new Uint8Array(300 * 200).fill(255)) };
+    // Something on it, but nothing staff-shaped.
+    for (let i = 0; i < 400; i++) blank.gray[(20 + (i % 20) * 7) * 300 + 30 + Math.floor(i / 20) * 9] = 0;
+    const { page, errors } = await open({ url: "https://songsterr.com/x", extract: { ok: false, reason: "unsupported", site: "generic", score: [blank] } });
+    assert.equal(await visible(page, "#view-notfound"), true);
+    assert.equal(await text(page, "#notfound-message"), STRINGS.popup.pictureNoStaves);
+    assert.equal(await visible(page, "#paste-body"), true);
+    assert.deepEqual(errors, []);
   });
 
   await t.test("the other bundled pages load without errors and fill their strings", async () => {

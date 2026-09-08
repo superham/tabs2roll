@@ -1,13 +1,13 @@
 /* GENERATED FILE — do not edit by hand. Rebuild with: npm run build
- * Built from: src/parse/tabshape.js, src/extract/sites/ultimate-guitar.js, src/extract/sites/generic.js, src/extract/sites/page.js
- * Build: 45a1e21d
+ * Built from: src/parse/tabshape.js, src/extract/sites/ultimate-guitar.js, src/extract/sites/generic.js, src/extract/sites/score-canvas.js, src/extract/sites/page.js
+ * Build: f4bb43b8
  *
  * This is the only code tab2roll ever runs inside a web page. It is injected
  * on toolbar click (activeTab), reads the page's DOM, returns plain data, and
  * touches nothing else: no UI, no styles, no storage, no network. */
 (() => {
 "use strict";
-const EXTRACTOR_BUILD = "45a1e21d";
+const EXTRACTOR_BUILD = "f4bb43b8";
 
 // ---- src/parse/tabshape.js ----
 // Shape heuristics — the shared, tested functions that decide whether a blob
@@ -221,11 +221,28 @@ function findInJson(root, key, maxDepth) {
   return null;
 }
 
-/** "GREENSLEEVES TAB by Traditional @ Ultimate-Guitar.Com" -> { title, artist, type } */
+/**
+ * "GREENSLEEVES TAB by Traditional @ Ultimate-Guitar.Com" -> { title, artist, type }
+ *
+ * Three things in a real page title that are not in that example, all of
+ * which used to make this give up and hand back nothing at all:
+ *   "(1) ..."          an unread-messages count, prepended by the site
+ *   "CHORDS & TABS"    what the Official (player) pages call themselves
+ *   "OFFICIAL ..."     the word that says it IS one, sitting in the song name
+ */
 function parseUltimateGuitarTitle(pageTitle) {
-  const m = /^(.*?)\s+(BASS TAB|BASS|UKULELE CHORDS|UKULELE|GUITAR PRO|POWER TAB|OFFICIAL|CHORDS|TAB|DRUM TAB|DRUMS|VIDEO)\s+by\s+(.*?)\s*(?:@|\||$)/i.exec(String(pageTitle || ""));
+  const cleaned = String(pageTitle || "").replace(/^\s*\(\d+\)\s*/, "");
+  const m = /^(.*?)\s+(BASS TABS?|BASS|UKULELE CHORDS|UKULELE|GUITAR PRO|POWER TABS?|OFFICIAL|CHORDS\s*(?:&|AND)\s*TABS?|CHORDS|TABS?|DRUM TABS?|DRUMS|VIDEO)\s+by\s+(.*?)\s*(?:@|\||$)/i.exec(cleaned);
   if (!m) return null;
-  return { title: titleCase(m[1]), artist: titleCase(m[3]), type: m[2].toLowerCase() };
+  let title = titleCase(m[1]);
+  let type = m[2].toLowerCase().replace(/\s+/g, " ");
+  // "Official The Trooper" is the song "The Trooper" on a player-only page.
+  const official = /^official\s+(.+)$/i.exec(title);
+  if (official) {
+    title = official[1];
+    type = "official";
+  }
+  return { title, artist: titleCase(m[3]), type };
 }
 
 function titleCase(s) {
@@ -256,7 +273,7 @@ function extractUltimateGuitar(doc, shape) {
     const meta = findInJson(json, "wiki_tab");
     const type = tabInfo && typeof tabInfo.type === "string" ? tabInfo.type.toLowerCase() : fromTitle.type || "";
     if (type && UG_UNSUPPORTED_TYPES.some((t) => type.indexOf(t) !== -1)) {
-      return { ok: false, reason: "unsupported", site: "ultimate-guitar", type };
+      return { ...base, ok: false, reason: "unsupported", type };
     }
     const content = meta && meta.wiki_tab && typeof meta.wiki_tab.content === "string" ? meta.wiki_tab.content : null;
     if (content && (shape.looksLikeSong(content) || type.indexOf("chord") !== -1 || /\[ch\]/.test(content))) {
@@ -277,9 +294,12 @@ function extractUltimateGuitar(doc, shape) {
     }
   }
 
-  // The page told us (in its title) that this is a player-only tab.
+  // The page told us (in its title) that this is a player-only tab. The song
+  // and artist go back with that: its notes may be out of reach as text, but
+  // it is still a named song, and a picture read off the player needs a name
+  // to be saved under.
   if (fromTitle.type && UG_UNSUPPORTED_TYPES.some((t) => fromTitle.type.indexOf(t) !== -1)) {
-    return { ok: false, reason: "unsupported", site: "ultimate-guitar", type: fromTitle.type };
+    return { ...base, ok: false, reason: "unsupported", type: fromTitle.type };
   }
   // Nothing from the store: let the generic extractor read the rendered DOM,
   // but keep the song title and artist we got from the page title.
@@ -396,6 +416,112 @@ function extractGeneric(doc, shape) {
   return { ok: true, site: "generic", title: pageTitle(doc), artist: "", text: found.text, strategy: found.strategy };
 }
 
+// ---- src/extract/sites/score-canvas.js ----
+// Picking up a score that is drawn rather than written.
+//
+// RUNS INSIDE THE TAB PAGE. Concatenated into src/extract/injected.js by
+// tools/build-injected.js — NO imports; depends only on `doc`.
+//
+// The interactive tab players (Ultimate Guitar's "Official" tabs, Songsterr,
+// anything built on Guitar Pro files) paint the music onto a <canvas>. There
+// is no tab text on those pages at all: not in the DOM, not in a script tag,
+// not in an attribute. The notes exist only as pixels.
+//
+// So this reads the pixels. It takes a copy of what is on the canvas and
+// hands it back as one byte of grey per pixel; making sense of it happens in
+// the popup, in src/read/, which is ordinary testable code. Nothing is drawn,
+// changed, scrolled or sent anywhere — the page is only looked at.
+//
+// A canvas shows the part of the score that is on screen, and no more. That
+// is a real limit and it is reported rather than hidden: `scroll` says how
+// much of the score the picture covers, so the popup can say "this is the
+// first eighth of it, scroll down for the rest".
+
+/** Smaller than this and it is an avatar, a sparkline or a tuner dial, not a score. */
+const MIN_SCORE_WIDTH = 200;
+const MIN_SCORE_HEIGHT = 60;
+
+/** Bigger than this and copying it would cost more than it is worth. */
+const MAX_SCORE_PIXELS = 8000000;
+
+/** A canvas with less going on than this is blank: an overlay, a cursor layer. */
+const MIN_CONTENT = 0.002;
+
+/** At most this many pictures come back, so a page of charts cannot flood the popup. */
+const MAX_CANDIDATES = 2;
+
+/** Luminance the way the eye sees it, from the same weights read/image.js uses. */
+function grayscaleOf(data, length) {
+  const gray = new Uint8Array(length);
+  let dark = 0;
+  for (let i = 0, p = 0; i < length; i++, p += 4) {
+    const alpha = data[p + 3];
+    if (alpha === 0) {
+      gray[i] = 255;
+      continue;
+    }
+    const lum = (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
+    gray[i] = alpha === 255 ? lum : 255 - (((255 - lum) * alpha) / 255 | 0);
+    if (gray[i] < 128) dark++;
+  }
+  // How much of the picture is the minority colour: ink on paper, or paper on
+  // ink if the player is in its dark theme. Either way a blank canvas scores
+  // nothing and a canvas with music on it scores a few per cent.
+  const darkShare = dark / length;
+  return { gray, content: Math.min(darkShare, 1 - darkShare) };
+}
+
+/** The nearest ancestor that scrolls, so the popup can say how much of the score this is. */
+function scrollStateOf(el, doc) {
+  let node = el;
+  for (let depth = 0; node && depth < 20; depth++) {
+    if (node.scrollHeight && node.clientHeight && node.scrollHeight > node.clientHeight + 8) {
+      return { top: node.scrollTop || 0, height: node.scrollHeight, visible: node.clientHeight };
+    }
+    node = node.parentElement;
+  }
+  const root = doc.scrollingElement || doc.documentElement;
+  if (root && root.scrollHeight > root.clientHeight + 8) {
+    return { top: root.scrollTop || 0, height: root.scrollHeight, visible: root.clientHeight };
+  }
+  return null;
+}
+
+/**
+ * Every canvas on the page that might be a score, best first.
+ *
+ * Returns [{ width, height, gray, content, scroll }]. Empty when there is
+ * nothing worth reading, which is the usual answer on an ordinary page.
+ */
+function findScoreImages(doc) {
+  const canvases = doc.querySelectorAll ? doc.querySelectorAll("canvas") : [];
+  const found = [];
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i];
+    const width = canvas.width | 0;
+    const height = canvas.height | 0;
+    if (width < MIN_SCORE_WIDTH || height < MIN_SCORE_HEIGHT) continue;
+    if (width * height > MAX_SCORE_PIXELS) continue;
+    let image = null;
+    try {
+      // Returns the context the page is already drawing with; null if the
+      // canvas belongs to WebGL. Throws for a canvas holding pixels from
+      // another site, which is a canvas we are not allowed to read.
+      const context = canvas.getContext("2d");
+      if (!context) continue;
+      image = context.getImageData(0, 0, width, height);
+    } catch (err) {
+      continue;
+    }
+    if (!image || !image.data) continue;
+    const { gray, content } = grayscaleOf(image.data, width * height);
+    if (content < MIN_CONTENT) continue;
+    found.push({ width, height, gray, content, scroll: scrollStateOf(canvas, doc) });
+  }
+  found.sort((a, b) => b.content - a.content);
+  return found.slice(0, MAX_CANDIDATES);
+}
+
 // ---- src/extract/sites/page.js ----
 // The entry point of the injected page script: run the site extractors in
 // order and return one plain result object.
@@ -408,6 +534,11 @@ function extractGeneric(doc, shape) {
 // Result shapes (all structured-cloneable):
 //   { ok: true,  site, text, title, artist, tuning?, capo?, type?, strategy }
 //   { ok: false, reason: "unsupported" | "none" | "error", site?, type?, message? }
+//
+// A failure may still carry `score`: pictures of the music taken off the
+// page's <canvas> elements, for pages that draw the tab instead of writing
+// it. Only failures carry them — there is no reason to copy a megabyte of
+// pixels off a page that has already given us the text.
 
 /**
  * A short account of what the page looked like to the extractor. Printed to
@@ -443,12 +574,27 @@ function describePage(doc, shape) {
 function extractFromPage(doc, shape, sites) {
   const ug = sites && sites.ultimateGuitar ? sites.ultimateGuitar : typeof extractUltimateGuitar === "function" ? extractUltimateGuitar : null; // eslint-disable-line no-undef
   const generic = sites && sites.generic ? sites.generic : typeof extractGeneric === "function" ? extractGeneric : null; // eslint-disable-line no-undef
+  const canvases = sites && sites.scoreCanvas ? sites.scoreCanvas : typeof findScoreImages === "function" ? findScoreImages : null; // eslint-disable-line no-undef
+
+  /** No text on this page. Before giving up, look for a picture of the music. */
+  const givingUp = (result) => {
+    const seen = describePage(doc, shape);
+    let score = [];
+    try {
+      score = canvases ? canvases(doc) : [];
+    } catch (err) {
+      seen.canvasError = String((err && err.message) || err);
+    }
+    seen.canvases = score.length;
+    return score.length ? { ...result, score, seen } : { ...result, seen };
+  };
+
   try {
     let hint = null;
     if (ug) {
       const r = ug(doc, shape);
       if (r && r.ok) return { ...r, seen: describePage(doc, shape) };
-      if (r && r.reason === "unsupported") return r;
+      if (r && r.reason === "unsupported") return givingUp(r);
       if (r && r.reason === "fallthrough") hint = r;
     }
     if (generic) {
@@ -461,9 +607,9 @@ function extractFromPage(doc, shape, sites) {
         }
         return { ...r, seen: describePage(doc, shape) };
       }
-      if (r && r.reason === "unsupported") return { ...r, seen: describePage(doc, shape) };
+      if (r && r.reason === "unsupported") return givingUp(r);
     }
-    return { ok: false, reason: "none", seen: describePage(doc, shape) };
+    return givingUp({ ok: false, reason: "none", title: hint ? hint.title : "", artist: hint ? hint.artist : "", site: hint ? hint.site : undefined });
   } catch (err) {
     return { ok: false, reason: "error", message: String((err && err.message) || err), seen: describePage(doc, shape) };
   }

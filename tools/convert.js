@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-// CLI: node tools/convert.js <tab.txt> [out.mid] [options]
+// CLI: node tools/convert.js <tab.txt | picture.png> [out.mid] [options]
+//
+// Give it a text tab, or a PNG of sheet music — a screenshot of a tab player,
+// a photo of a page — and it reads the tab off the picture first. That is the
+// same reader the extension runs on a page that draws its tab instead of
+// writing it; --show-tab prints what it made of the picture.
 //
 // Options:
 //   --tuning <id>     standard | drop-d | eb-standard | d-standard | dadgad | open-g | open-d
@@ -8,6 +13,7 @@
 //   --no-arrange      only the literal guitar track
 //   --title <t>  --artist <a>
 //   --notes           print every note of the guitar track
+//   --show-tab        print the tab read off a picture
 //   --json            print the IR as JSON instead of a summary
 //
 // With no output path the file is written next to the input, named after
@@ -17,6 +23,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { convertText, ParseError } from "../src/pipeline.js";
 import { midiToNoteName } from "../src/parse/tuning.js";
+import { readSheetMusic } from "../src/read/index.js";
+import { isPng, readPng } from "./png.js";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -24,6 +32,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--no-arrange") args.arrange = false;
     else if (a === "--notes") args.notes = true;
+    else if (a === "--show-tab") args.showTab = true;
     else if (a === "--json") args.json = true;
     else if (a.startsWith("--")) args[a.slice(2)] = argv[++i];
     else args._.push(a);
@@ -33,12 +42,35 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args._.length) {
-  console.error("usage: node tools/convert.js <tab.txt> [out.mid] [--tuning id] [--step 1/8] [--tempo bpm] [--no-arrange] [--notes] [--json]");
+  console.error("usage: node tools/convert.js <tab.txt | picture.png> [out.mid] [--tuning id] [--step 1/8] [--tempo bpm] [--no-arrange] [--notes] [--show-tab] [--json]");
   process.exit(2);
 }
 
 const input = args._[0];
-const text = readFileSync(input, "utf8");
+const bytes = new Uint8Array(readFileSync(input));
+let text;
+let reading = null;
+if (isPng(bytes)) {
+  reading = readSheetMusic(readPng(bytes));
+  if (!reading.ok) {
+    console.error(`No luck: ${describeReading(reading)}`);
+    process.exit(1);
+  }
+  text = reading.text;
+  console.log(`Read the picture: ${reading.notes} notes on ${reading.staves} stave(s) of ${reading.strings} strings, ${reading.bars} bar line(s).`);
+  console.log(`  sureness: ${(reading.confidence * 100).toFixed(0)}%${reading.unreadable ? `, ${reading.unreadable} mark(s) it could not make out` : ""}${reading.notation ? `, ${reading.notation} stave(s) of notation left alone` : ""}`);
+  if (args.showTab) console.log("\n" + text + "\n");
+} else {
+  text = new TextDecoder().decode(bytes);
+}
+
+function describeReading(r) {
+  if (r.reason === "blank") return "there is nothing on that picture";
+  if (r.reason === "no-staves") return "no staves in that picture — try a bigger or sharper one";
+  if (r.reason === "notation-only") return "that is notes on a stave, not tab; only tab can be read so far";
+  return "staves in that picture, but no fret numbers on them";
+}
+
 let result;
 try {
   result = convertText(text, {

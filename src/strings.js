@@ -29,6 +29,25 @@ export const STRINGS = {
     pasteLooksLikeChords: "That looks like a chord sheet. Ready when you are.",
     pasteNotYet: "I can't see any tab in that yet. Paste the whole thing, including the lines of dashes.",
 
+    // Reading a picture of the music (an interactive tab player, or a
+    // screenshot someone dropped in). Every one of these says what was read
+    // and what to do about it: a picture read is a good guess, never a
+    // certainty, and pretending otherwise would be the wrong tone entirely.
+    readingPicture: "Reading the sheet music on this page…",
+    foundPicture: "Read the sheet music on this page:",
+    pictureNotes: (notes) => `${notes} notes, read off the picture.`,
+    pictureCheck: "Have a look at the numbers below before you send it — reading a picture is guesswork, and it is much quicker to fix here than in your DAW.",
+    pictureUnsure: "Some of the marks were hard to make out. Check the numbers below and put right any that look wrong.",
+    picturePartial: (percent) => `That's about ${percent}% of the song: the part that was on screen. Scroll the page down and open tab2roll again to read the next bit.`,
+    pictureAdd: "Join this onto what I read before",
+    pictureAdded: "Joined onto what you read before.",
+    pictureNoStaves: "This page draws its tab as a picture, and I couldn't make out the strings in it. Try making the page bigger (Ctrl and +) and clicking again.",
+    pictureNotation: "This page is showing you notes on a stave rather than fret numbers on a tab. I can only read tab so far — look for the tab view, or one of the text tabs for this song.",
+    pictureNothing: "I found the sheet music but couldn't read any fret numbers off it. Try making the page bigger (Ctrl and +) and clicking again.",
+    dropPicture: "You can also drop a picture of some tab in here, or paste one.",
+    dropReading: "Reading that picture…",
+    dropFailed: "I couldn't find any tab in that picture. It needs to show the strings and the fret numbers, big enough to read.",
+
     notFound: "I couldn't find any tab on this page. Make sure you're on a tab page and that it's finished loading.",
     unsupported: "This tab is in a format I can't read yet. Try one of the text tabs for this song.",
     noNotes: "I found the tab but couldn't make sense of it. Try pasting the tab text in below and I'll have another go.",
@@ -128,9 +147,17 @@ export const STRINGS = {
     tuning1: "Most often the tab is in a different tuning than tab2roll guessed. Right after a conversion the window shows \"Wrong tuning? Re-do as:\" — pick the right one and a new file is saved.",
     tuning2: "Tab2roll reads tuning hints in the tab (\"Tuning: Drop D\", \"half step down\", the letters at the start of each line) and the capo, if the tab mentions one.",
 
+    sheetHeading: "Tabs that are drawn, not written",
+    sheet1: "Some tab pages don't have any tab text on them at all. The \"Official\" and \"Pro\" tabs on Ultimate Guitar, and interactive players like Songsterr, paint the music onto the page as a picture, the way a printed songbook does. There is nothing to copy: the notes are pixels.",
+    sheet2: "Tab2roll reads those pictures. Click the toolbar button on one of those pages and it works out where the strings are, reads the fret numbers off them, and shows you the tab it made in the box under the button before anything is saved.",
+    sheet3: "Check it before you send it. Reading a picture is guesswork and a number now and then comes out wrong; it is far quicker to fix a 7 that should be a 1 in that box than to hunt for it in your DAW afterwards. Tab2roll says how many marks it could not make out, and if it is unsure it says so.",
+    sheet4: "A player only draws the bars that are on screen, so one click reads one screenful. Scroll the page down, open tab2roll again, and click \"Join this onto what I read before\" to add the next stretch to what you already have.",
+    sheet5: "You can also drop a picture straight into the window, or paste one in: a screenshot of any tab player, a photo of a page from a songbook, a page of a PDF. The bigger and sharper the numbers are, the better it reads them — if a page comes out badly, zoom in (Ctrl and +) and try again.",
+    sheet6: "It reads tablature — fret numbers on strings. Notes written on an ordinary five-line stave are a different problem and tab2roll leaves them alone rather than guessing; it will tell you that is what it found.",
+
     notFoundHeading: "It can't find the tab on the page",
-    notFound1: "Make sure the page has finished loading and that it shows the tab as text, not as a picture or an interactive player.",
-    notFound2: "Some tab pages (\"Official\", \"Pro\", \"Guitar Pro\" tabs) are not text and can't be read. Look for a plain text tab of the same song.",
+    notFound1: "Make sure the page has finished loading. If the page shows the tab as a picture rather than as text, see \"Tabs that are drawn, not written\" above.",
+    notFound2: "Some pages have neither: a video lesson, or a page that is still loading its player. Look for a plain text tab of the same song.",
     notFound3: "You can always select the tab text on the page, copy it, and paste it into the box under the button. That works on any site, forum, or PDF.",
 
     pasteHeading: "Pasting a tab",

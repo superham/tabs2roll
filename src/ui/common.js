@@ -71,6 +71,25 @@ export function setLastResult(result) {
 }
 
 /**
+ * The last tab read off a picture, so a second look at the same page can be
+ * joined onto the first. A tab player only draws the bars that are on screen,
+ * so reading a whole song means reading it a screenful at a time.
+ */
+export const PICTURE_READ_TTL_MS = 30 * 60 * 1000;
+
+export function getPictureRead(url) {
+  const read = readStore("pictureRead", null);
+  if (!read || typeof read !== "object" || typeof read.at !== "number") return null;
+  if (Date.now() - read.at > PICTURE_READ_TTL_MS) return null;
+  if (url && read.url && read.url !== url) return null;
+  return read;
+}
+
+export function setPictureRead(read) {
+  return writeStore("pictureRead", read ? { ...read, at: Date.now() } : null);
+}
+
+/**
  * The installed version, straight from the manifest, so what the popup shows
  * can never drift from what is actually running. Useful when checking that a
  * reload of the add-on took effect.

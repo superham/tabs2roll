@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const SOURCES = ["src/parse/tabshape.js", "src/extract/sites/ultimate-guitar.js", "src/extract/sites/generic.js", "src/extract/sites/page.js"];
+export const SOURCES = ["src/parse/tabshape.js", "src/extract/sites/ultimate-guitar.js", "src/extract/sites/generic.js", "src/extract/sites/score-canvas.js", "src/extract/sites/page.js"];
 export const OUTPUT = "src/extract/injected.js";
 
 /** Where the injected script leaves its result for the popup to collect. */

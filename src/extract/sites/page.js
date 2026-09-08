@@ -9,6 +9,11 @@
 // Result shapes (all structured-cloneable):
 //   { ok: true,  site, text, title, artist, tuning?, capo?, type?, strategy }
 //   { ok: false, reason: "unsupported" | "none" | "error", site?, type?, message? }
+//
+// A failure may still carry `score`: pictures of the music taken off the
+// page's <canvas> elements, for pages that draw the tab instead of writing
+// it. Only failures carry them — there is no reason to copy a megabyte of
+// pixels off a page that has already given us the text.
 
 /**
  * A short account of what the page looked like to the extractor. Printed to
@@ -44,12 +49,27 @@ export function describePage(doc, shape) {
 export function extractFromPage(doc, shape, sites) {
   const ug = sites && sites.ultimateGuitar ? sites.ultimateGuitar : typeof extractUltimateGuitar === "function" ? extractUltimateGuitar : null; // eslint-disable-line no-undef
   const generic = sites && sites.generic ? sites.generic : typeof extractGeneric === "function" ? extractGeneric : null; // eslint-disable-line no-undef
+  const canvases = sites && sites.scoreCanvas ? sites.scoreCanvas : typeof findScoreImages === "function" ? findScoreImages : null; // eslint-disable-line no-undef
+
+  /** No text on this page. Before giving up, look for a picture of the music. */
+  const givingUp = (result) => {
+    const seen = describePage(doc, shape);
+    let score = [];
+    try {
+      score = canvases ? canvases(doc) : [];
+    } catch (err) {
+      seen.canvasError = String((err && err.message) || err);
+    }
+    seen.canvases = score.length;
+    return score.length ? { ...result, score, seen } : { ...result, seen };
+  };
+
   try {
     let hint = null;
     if (ug) {
       const r = ug(doc, shape);
       if (r && r.ok) return { ...r, seen: describePage(doc, shape) };
-      if (r && r.reason === "unsupported") return r;
+      if (r && r.reason === "unsupported") return givingUp(r);
       if (r && r.reason === "fallthrough") hint = r;
     }
     if (generic) {
@@ -62,9 +82,9 @@ export function extractFromPage(doc, shape, sites) {
         }
         return { ...r, seen: describePage(doc, shape) };
       }
-      if (r && r.reason === "unsupported") return { ...r, seen: describePage(doc, shape) };
+      if (r && r.reason === "unsupported") return givingUp(r);
     }
-    return { ok: false, reason: "none", seen: describePage(doc, shape) };
+    return givingUp({ ok: false, reason: "none", title: hint ? hint.title : "", artist: hint ? hint.artist : "", site: hint ? hint.site : undefined });
   } catch (err) {
     return { ok: false, reason: "error", message: String((err && err.message) || err), seen: describePage(doc, shape) };
   }
