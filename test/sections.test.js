@@ -284,13 +284,13 @@ test("the callouts become markers in the file, whether or not it is split", () =
   ]);
 });
 
-test("splitSections gives a DAW one named track per part, in playing order", () => {
+test("a track is named for its part first, then the instrument", () => {
   const { bytes, summary } = convertText(TAB, { arrange: false, splitSections: true });
   const tracks = readMidi(bytes).tracks.slice(1);
   assert.deepEqual(tracks.map((t) => t.name), [
-    "Guitar (as tabbed) - Intro",
-    "Guitar (as tabbed) - Estribillo",
-    "Guitar (as tabbed) - Guitar solo",
+    "Intro - Guitar",
+    "Estribillo - Guitar",
+    "Guitar solo - Guitar",
   ]);
   assert.ok(tracks.every((t) => t.notes.length > 0), "no empty tracks");
   assert.equal(summary.splitSections, true);
@@ -331,8 +331,8 @@ E|-----------------|
   const file = readMidi(bytes);
   assert.deepEqual(file.tracks[0].markers.map((m) => m.text), ["前奏", "припев"]);
   assert.deepEqual(file.tracks.slice(1).map((t) => t.name), [
-    "Guitar (as tabbed) - 前奏",
-    "Guitar (as tabbed) - припев",
+    "前奏 - Guitar",
+    "припев - Guitar",
   ]);
 });
 
@@ -343,9 +343,9 @@ test("a marked-up tab arrives split, without anyone having to ask", () => {
   const { summary } = convertText(TAB, { arrange: false });
   assert.equal(summary.splitSections, true);
   assert.deepEqual(summary.trackNames, [
-    "Guitar (as tabbed) - Intro",
-    "Guitar (as tabbed) - Estribillo",
-    "Guitar (as tabbed) - Guitar solo",
+    "Intro - Guitar",
+    "Estribillo - Guitar",
+    "Guitar solo - Guitar",
   ]);
 });
 

@@ -11,28 +11,42 @@ export const PPQ = 480;
  * Per-role track settings. Program numbers are General MIDI, zero-based:
  *   27 Electric Guitar (clean), 89 Pad 2 (warm), 39 Synth Bass 2, 81 Lead 2 (sawtooth).
  * Each role sits on its own channel so a DAW splits them cleanly.
+ *
+ * `short` is the instrument on its own, for when the track name already says
+ * which part of the song it holds. Standing alone, "Guitar (as tabbed)" earns
+ * its qualifier: it is what distinguishes the notes someone actually wrote
+ * from the three tracks the arranger invented. Repeated down a column of six
+ * parts it is just noise, and the part is doing the explaining by then.
  */
 export const TRACK_SETTINGS = {
-  guitar: { name: "Guitar (as tabbed)", program: 27, channel: 0 },
-  chords: { name: "Chords", program: 89, channel: 1 },
-  bass: { name: "Bass", program: 39, channel: 2 },
-  lead: { name: "Lead", program: 81, channel: 3 },
+  guitar: { name: "Guitar (as tabbed)", short: "Guitar", program: 27, channel: 0 },
+  chords: { name: "Chords", short: "Chords", program: 89, channel: 1 },
+  bass: { name: "Bass", short: "Bass", program: 39, channel: 2 },
+  lead: { name: "Lead", short: "Lead", program: 81, channel: 3 },
 };
 
 /** Order tracks appear in the file, after the tempo track. */
 export const TRACK_ORDER = ["guitar", "chords", "bass", "lead"];
 
 /**
- * What joins a role's name to the part of the song a track holds:
- * "Guitar (as tabbed) - Chorus 2". A plain hyphen, because a track name is
- * read back by every DAW there is and some of them are old.
+ * What joins the part of the song to the instrument playing it:
+ * "Chorus 2 - Guitar". A plain hyphen, because a track name is read back by
+ * every DAW there is and some of them are old.
  */
 export const SECTION_NAME_JOIN = " - ";
 
-/** The name a DAW shows for a track: its role, and its part of the song. */
+/**
+ * The name a DAW shows for a track: the part of the song, then the instrument.
+ *
+ * The part comes first because that is what the name is FOR. A DAW lists
+ * tracks by name, so leading with the part puts the song in its own order
+ * down the track list — Intro/Verse, Chorus, Verse 2 — instead of six lines
+ * that all start with the same word and differ at the end.
+ */
 export function trackName(track) {
   const settings = TRACK_SETTINGS[track.role] || { name: track.role };
-  return track.section ? settings.name + SECTION_NAME_JOIN + track.section : settings.name;
+  if (!track.section) return settings.name;
+  return track.section + SECTION_NAME_JOIN + (settings.short || settings.name);
 }
 
 // --------------------------------------------------------------------------

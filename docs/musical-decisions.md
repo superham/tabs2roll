@@ -270,8 +270,9 @@ zero-based General MIDI values. At the same tick, note-offs are written before n
 so a repeated pitch re-triggers.
 
 When the tracks are split by section, the tabbed role keeps its program and channel and
-every one of its parts is written as its own track, in playing order, named
-"Guitar (as tabbed) - Chorus 2"; the arranger's tracks follow it whole. Both are on by
+every one of its parts is written as its own track, in playing order, named for the
+part and then the instrument —
+"Chorus 2 - Guitar"; the arranger's tracks follow it whole. Both are on by
 default — a song with parts arrives in parts, because someone who wants a track per
 section should not have to find a setting first — and `splitSections: false` gives back
 the one long track. Markers are written either way.
