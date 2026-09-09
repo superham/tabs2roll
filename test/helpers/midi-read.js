@@ -32,6 +32,7 @@ export function readMidi(bytes) {
     let tick = 0;
     let running = null;
     let name = null;
+    const markers = [];
     let program = null;
     let tempo = null;
     let timeSignature = null;
@@ -43,7 +44,11 @@ export function readMidi(bytes) {
         const l = vlq();
         const data = Array.from(bytes.slice(pos, pos + l));
         pos += l;
-        if (type === 0x03) name = String.fromCharCode(...data);
+        // Meta text is written as UTF-8, so read it back that way: decoding
+        // it a byte at a time would turn a section named 前奏 into mojibake
+        // and make a passing test look like a failing one.
+        if (type === 0x03) name = new TextDecoder().decode(Uint8Array.from(data));
+        if (type === 0x06) markers.push({ tick, text: new TextDecoder().decode(Uint8Array.from(data)) });
         if (type === 0x51) tempo = Math.round(60000000 / ((data[0] << 16) | (data[1] << 8) | data[2]));
         if (type === 0x58) timeSignature = [data[0], 2 ** data[1]];
         events.push({ tick, meta: type, data });
@@ -84,7 +89,7 @@ export function readMidi(bytes) {
         }
       }
     }
-    tracks.push({ name, program, tempo, timeSignature, events, notes });
+    tracks.push({ name, markers, program, tempo, timeSignature, events, notes });
   }
   return { format, trackCount, division, tracks };
 }

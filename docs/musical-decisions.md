@@ -210,9 +210,15 @@ has to reach `CALLOUT_THRESHOLD` (3).
 | Alone | `isolated` | +1 | A blank line above it, or the top of the text. |
 | Said again | `recurring` | +1 | The same label heads music more than once: songs repeat their parts. |
 | Ends in a full stop | `stopped` | -2 | `Everything.` is the end of a sentence, not the name of a part. |
-| Too many words | `wordy` | -2 | More than `MAX_LABEL_WORDS` (6). |
 
-Two rules sit outside the scoring because they are absolute:
+Two caps are applied before any of that, as hard rejects rather than penalties: a label
+longer than `MAX_LABEL_LENGTH` (48 characters) or of more than `MAX_LABEL_WORDS` (5)
+words is not a heading at all. The word cap is what tells `[Chorus]` from
+`[You know i always try to settle ya']`, the line of words an Ultimate Guitar tabber
+brackets just as readily as the part being played; no other signal separates them,
+since both are bracketed, both sit on their own line and both have music underneath.
+
+Three more rules sit outside the scoring because they are absolute:
 
 - **A sung-looking line needs an explicit mark.** In a chord sheet every lyric is short,
   capitalised and sitting on top of music, so shape and position carry no information
@@ -221,6 +227,10 @@ Two rules sit outside the scoring because they are absolute:
   solo", "Riff 2").
 - **A heading with no music left below it heads nothing** — that is the page talking
   ("Comments", "Related tabs").
+- **A bracket that closes early is a heading with a note after it.** The note joins the
+  name when the result still fits both caps above — `[Verse 2] (Rythm):` and
+  `[Verse 2] (Lead):` are two different parts and each needs its qualifier — and is
+  dropped when it is a sentence, leaving `[Verse] THIS GRADUALLY SLOWS DOWN` as `Verse`.
 
 Sections are then the beats between one callout and the next, named after it; a repeated
 label is numbered ("Chorus", "Chorus 2") so every part has a name of its own. Music

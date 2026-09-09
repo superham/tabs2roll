@@ -271,9 +271,7 @@ test("a tab headed three different ways comes out as three sections", () => {
 
 test("the callouts become markers in the file, whether or not it is split", () => {
   const { bytes } = convertText(TAB, { arrange: false });
-  const markers = readMidi(bytes)
-    .tracks[0].events.filter((e) => e.meta === 0x06)
-    .map((e) => [String.fromCharCode(...e.data), e.tick / 480]);
+  const markers = readMidi(bytes).tracks[0].markers.map((m) => [m.text, m.tick / 480]);
   assert.deepEqual(markers, [
     ["Intro", 0],
     ["Estribillo", 4],
@@ -299,6 +297,38 @@ test("splitting loses no notes and moves none of them", () => {
   const split = convertText(TAB, { arrange: false, splitSections: true });
   const starts = (r) => r.ir.tracks.flatMap((t) => t.notes.map((n) => n.start)).sort((a, b) => a - b);
   assert.deepEqual(starts(split), starts(whole));
+});
+
+test("a section named in another script survives into the file", () => {
+  // The callout finder reads Cyrillic and CJK headings, so the encoder has to
+  // carry them. Writing meta text as ASCII turned 前奏 into "??" and threw
+  // away the one thing that detection exists to produce.
+  const tab = `前奏
+
+e|-----------------|
+B|-----------------|
+G|-----------------|
+D|-----------------|
+A|-----------------|
+E|-0---0---3---3---|
+
+припев
+
+e|-----------------|
+B|-----------------|
+G|--0---2---3---2--|
+D|-----------------|
+A|-----------------|
+E|-----------------|
+`;
+  const { ir, bytes } = convertText(tab, { arrange: false, splitSections: true });
+  assert.deepEqual(ir.sections.map((s) => s.name), ["前奏", "припев"]);
+  const file = readMidi(bytes);
+  assert.deepEqual(file.tracks[0].markers.map((m) => m.text), ["前奏", "припев"]);
+  assert.deepEqual(file.tracks.slice(1).map((t) => t.name), [
+    "Guitar (as tabbed) - 前奏",
+    "Guitar (as tabbed) - припев",
+  ]);
 });
 
 test("a tab with no callouts is left as one track, as it always was", () => {

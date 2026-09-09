@@ -59,13 +59,32 @@ function u16(n) {
   return [(n >>> 8) & 0xff, n & 0xff];
 }
 
-function ascii(text) {
+/** The four-byte chunk identifiers ("MThd", "MTrk"), which are ASCII by spec. */
+function ascii(tag) {
   const out = [];
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
+  for (let i = 0; i < tag.length; i++) {
+    const code = tag.charCodeAt(i);
     out.push(code < 128 ? code : 0x3f); // "?" for anything outside ASCII
   }
   return out;
+}
+
+/**
+ * Text for a meta event — a track name, a marker — as UTF-8 bytes.
+ *
+ * SMF 1.0 says text events "should" be ASCII, and writing them that way turned
+ * a section the parser had just read as 前奏 into "??". That is worse than
+ * useless: it is lossy, and it throws away the one thing the multilingual
+ * callout finder exists to produce. Every DAW worth the name reads these as
+ * UTF-8, and one that does not shows mojibake, which is no worse than "??"
+ * and usually better. Meta events carry their own byte length, so a
+ * multi-byte character costs nothing but bytes.
+ *
+ * TextEncoder is a WHATWG global, present in Node and in the browser alike —
+ * not a DOM API, so this module stays as portable as it was.
+ */
+function text(value) {
+  return Array.from(new TextEncoder().encode(String(value)));
 }
 
 function chunk(tag, body) {
@@ -109,7 +128,7 @@ function tempoTrack(ir) {
   for (const section of (ir.sections || []).filter((s) => s && s.name && Number.isFinite(s.start))) {
     const tick = Math.max(0, Math.round(section.start * PPQ));
     if (tick < lastTick) continue; // sections are in playing order; ignore any that are not
-    body.push(...vlq(tick - lastTick), ...meta(0x06, ascii(section.name)));
+    body.push(...vlq(tick - lastTick), ...meta(0x06, text(section.name)));
     lastTick = tick;
   }
   body.push(...vlq(0), ...meta(0x2f, []));
@@ -135,7 +154,7 @@ function noteTrack(track) {
   }
   events.sort((a, b) => a.tick - b.tick || a.order - b.order);
 
-  const body = [...vlq(0), ...meta(0x03, ascii(trackName(track))), ...vlq(0), 0xc0 | ch, settings.program & 0x7f];
+  const body = [...vlq(0), ...meta(0x03, text(trackName(track))), ...vlq(0), 0xc0 | ch, settings.program & 0x7f];
   let lastTick = 0;
   for (const e of events) {
     body.push(...vlq(e.tick - lastTick), ...e.bytes);

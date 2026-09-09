@@ -25,7 +25,13 @@ export { ParseError };
  *
  * Returns { ir, bytes, filename, summary } where summary is what the UI
  * needs: { title, artist, kind, rhythmSource, tuningId, tuningNotes, tracks,
- * parts, sections, noteCount, staves, chords }.
+ * trackNames, sections, splitSections, noteCount, staves, chords, tempo,
+ * timeSignature }.
+ *   tracks         one name per role, however many tracks each role holds
+ *   trackNames     one name per track actually written to the file, in order
+ *   sections       the names of the song's parts, or [] when it has none
+ *   splitSections  whether the file really was split (asking for it on a tab
+ *                  with nothing to split leaves the tracks whole)
  * Throws ParseError with code "no-tab" or "no-notes" when there is nothing
  * to convert.
  */
