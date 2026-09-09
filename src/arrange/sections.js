@@ -49,8 +49,9 @@ export function sectionRanges(sections) {
  * Each output track keeps its `role` — so it keeps the instrument and channel
  * the encoder gives that role — and gains a `section` naming the part it
  * holds. Sections with nothing in them are left out rather than written as
- * empty tracks. Roles outside SPLIT_ROLES pass through untouched, in the
- * order they arrived.
+ * empty tracks. Roles outside SPLIT_ROLES come through unsplit, in the order
+ * they arrived; a track that already had no notes is dropped either way,
+ * which changes nothing, since the encoder never writes an empty track.
  *
  * Returns a new IR; the input is not modified. An IR with fewer than two
  * sections comes back unchanged, because there is nothing to split.

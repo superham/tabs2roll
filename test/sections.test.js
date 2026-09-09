@@ -228,6 +228,22 @@ test("splitBySection cuts the tab and leaves the arranger's tracks whole", () =>
   assert.equal(ir.tracks[0].notes.length, 4, "the input is left alone");
 });
 
+test("nothing to cut means nothing is cut, and no track claims a part", () => {
+  // The arranger's roles are not split, so an IR holding only those comes
+  // back exactly as it went in — which is what lets the summary report
+  // whether a file really was split by looking at the tracks themselves.
+  const ir = {
+    sections: [
+      { name: "Intro", start: 0, end: 4 },
+      { name: "Chorus", start: 4, end: 8 },
+    ],
+    tracks: [{ role: "chords", notes: [note(0), note(5)] }],
+  };
+  const out = splitBySection(ir);
+  assert.deepEqual(out.tracks, ir.tracks);
+  assert.ok(!out.tracks.some((t) => t.section));
+});
+
 test("a song with one part comes back whole", () => {
   const ir = { sections: [{ name: "Intro", start: 0, end: 4 }], tracks: [{ role: "guitar", notes: [note(0)] }] };
   assert.deepEqual(splitBySection(ir).tracks, ir.tracks);
@@ -347,6 +363,13 @@ test("a marked-up tab arrives split, without anyone having to ask", () => {
     "Estribillo - Guitar",
     "Guitar solo - Guitar",
   ]);
+});
+
+test("the summary reports what happened, not what was asked for", () => {
+  // Splitting asked for, but a tab with no callouts has nothing to split.
+  const plain = "e|--0--2--3--2--0--|\nB|-----------------|\nG|-----------------|\nD|-----------------|\nA|-----------------|\nE|-----------------|\n";
+  const { summary } = convertText(plain, { arrange: false, splitSections: true });
+  assert.equal(summary.splitSections, false);
 });
 
 test("...and splitSections: false still gets you the one long track", () => {

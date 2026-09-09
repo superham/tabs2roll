@@ -38,8 +38,10 @@ export { ParseError };
 export function convertText(text, options = {}) {
   const parsed = parseText(text, options);
   const arranged = options.arrange === false ? parsed : arrange(parsed);
-  // Splitting comes last so every track the arranger made is cut along the
-  // same lines as the one it was made from.
+  // Splitting comes last, so it cuts the tabbed track after the arranger has
+  // read it whole — the chords and bassline are derived from the whole
+  // performance, not from one part at a time. Only the tab is cut; see
+  // SPLIT_ROLES.
   const ir = options.splitSections === false ? arranged : splitBySection(arranged);
   const bytes = encodeMidi(ir);
   const filename = buildFilename(ir, options.filenameSuffix || "");
@@ -55,7 +57,10 @@ export function convertText(text, options = {}) {
     tracks: roleNames(ir),
     trackNames: trackNames(ir),
     sections: (ir.sections || []).map((s) => s.name),
-    splitSections: options.splitSections !== false && (ir.sections || []).length > 1,
+    // Read off the result, not off the request: asking to split a tab that
+    // has nothing to split leaves the tracks whole, and the summary should
+    // say so. A track carries `section` only if it was actually cut.
+    splitSections: ir.tracks.some((t) => t.section),
     noteCount: guitarNotes.length,
     staves: ir.info ? ir.info.staves : 0,
     chords: ir.info ? ir.info.chords : 0,
