@@ -613,6 +613,19 @@ test("PNG: a file cut short after a chunk body is turned down, not decoded", () 
   assert.throws(() => readPng(bytes.subarray(0, bodyEnd)));
 });
 
+test("PNG: a file that never reaches its end marker is turned down", () => {
+  // Losing the last four bytes costs the end marker its checksum, and losing
+  // twelve costs the marker itself. Neither touches a pixel, so both used to
+  // decode into a picture that looked whole; the only sign the file was cut
+  // short was the ending that never came.
+  const picture = renderTab(["|--3--5--|", "|--------|", "|--------|", "|--------|", "|--------|", "|--------|"].join("\n"));
+  const bytes = writePng(picture);
+  assert.equal(readPng(bytes).width, picture.width);
+  for (const short of [4, 12]) {
+    assert.throws(() => readPng(bytes.subarray(0, bytes.length - short)), /cut short/, `${short} bytes off the end should be refused`);
+  }
+});
+
 test("PNG: anything else is turned down with a plain reason", () => {
   assert.equal(isPng(new Uint8Array([1, 2, 3])), false);
   assert.throws(() => readPng(new Uint8Array([1, 2, 3])), /not a PNG/);

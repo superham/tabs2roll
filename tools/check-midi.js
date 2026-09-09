@@ -39,13 +39,15 @@ const tag = () => String.fromCharCode(u8(), u8(), u8(), u8());
  *
  * Spreading the bytes into String.fromCharCode blows the call stack on a long
  * one, and a long one is legal: the length is a variable-quantity number, so a
- * track name may be as big as the file. Decoded byte for byte rather than as
- * UTF-8, because a text meta event is bytes and this tool reports what is in
- * the file rather than guessing at an encoding for it.
+ * track name may be as big as the file. Only the bytes the report can show are
+ * decoded, one more than that so the ellipsis knows whether it is needed, so a
+ * name the size of the file costs no more than a short one. Decoded byte for
+ * byte rather than as UTF-8, because a text meta event is bytes and this tool
+ * reports what is in the file rather than guessing at an encoding for it.
  */
 const MAX_TEXT = 120;
 const textOf = (data) => {
-  const text = Buffer.from(data).toString("latin1");
+  const text = data.toString("latin1", 0, MAX_TEXT + 1);
   return text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) + "…" : text;
 };
 

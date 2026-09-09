@@ -36,6 +36,7 @@ export function readPng(bytes) {
   let header = null;
   let palette = null;
   let transparency = null;
+  let ended = false;
   const data = [];
 
   while (at + 8 <= bytes.length) {
@@ -60,12 +61,18 @@ export function readPng(bytes) {
     } else if (type === "IDAT") {
       data.push(bytes.subarray(start, start + length));
     } else if (type === "IEND") {
+      ended = true;
       break;
     }
     at = start + length + 4;
   }
 
   if (!header) throw new Error("that PNG has no header in it");
+  // Reaching the end marker is the only proof the file is all here. Without
+  // it a PNG cut short anywhere past its last full chunk — including one
+  // missing nothing but the end marker's own checksum — would decode to a
+  // picture that looks whole and is not.
+  if (!ended) throw new Error("that PNG stops before its end marker; the file is cut short");
   if (header.interlace) throw new Error("that PNG is interlaced, which this reader does not handle; save it again without interlacing");
   const channels = CHANNELS[header.colour];
   if (!channels) throw new Error(`that PNG uses a colour type this reader does not handle (${header.colour})`);
