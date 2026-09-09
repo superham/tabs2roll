@@ -569,7 +569,7 @@ function saidAfterTheWalk(message) {
 
 function currentOptions() {
   const options = getOptions();
-  return { step: options.step, arrange: options.arrange !== false };
+  return { step: options.step, arrange: options.arrange !== false, splitSections: options.splitSections === true };
 }
 
 async function convert({ text, meta, options }) {

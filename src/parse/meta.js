@@ -2,6 +2,7 @@
 // Works on the non-tab lines of a text. Pure string work.
 
 import { parseTuningText } from "./tuning.js";
+import { isTabShapedLine } from "./tabshape.js";
 
 const TEMPO_MIN = 40;
 const TEMPO_MAX = 300;
@@ -125,6 +126,11 @@ export function findTitleAndArtist(lines) {
     // Fall back to the first short line that is not tab, a section marker,
     // a chord line, or a header field. That is where tabbers put the title.
     for (const line of head) {
+      // ...and stop at the music. A title sits above the first stave, never
+      // below it, so a tab that starts straight in on "[Intro]" simply has no
+      // title line. Reading on found whatever words happened to be written
+      // between the staves and called that the song.
+      if (isStave(line)) break;
       const t = line.trim().replace(/^[-=*_#\s]+|[-=*_#\s]+$/g, "");
       if (!t || t.length > 60 || !/[A-Za-z]/.test(t)) continue;
       if (/\b(tuning|tuned|capo|tempo|bpm|tabbed|tab by|standard|http|www\.)\b/i.test(t)) continue;
@@ -136,6 +142,15 @@ export function findTitleAndArtist(lines) {
     }
   }
   return { title: cleanupName(title), artist: cleanupName(artist) };
+}
+
+/**
+ * A stave line, as opposed to a rule drawn out of dashes. Plenty of tabs put
+ * "----------------" above and below the title, and stopping there would lose
+ * the title the rule was drawn to set off.
+ */
+function isStave(line) {
+  return isTabShapedLine(line) && !/^[-=_*~\s|]+$/.test(line);
 }
 
 function looksLikeTabLine(t) {

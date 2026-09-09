@@ -38,6 +38,7 @@ export function goldenFor(text) {
     firstStart: guitar[0].start,
     lastStart: guitar[guitar.length - 1].start,
     techniques: countBy(guitar.map((n) => n.technique).filter(Boolean)),
+    sections: ir.sections.map((s) => `${s.name} ${s.start}-${s.end}`),
     tracks,
   };
 }

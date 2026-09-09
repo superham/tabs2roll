@@ -1,0 +1,55 @@
+# Runs on every pull request, so a change that quietly stops finding the parts
+# of a song — or breaks any of the other fixtures — fails before it can merge.
+#
+# Make it a merge gate in Settings -> Branches -> branch protection rules for
+# `main`: tick "Require status checks to pass before merging" and pick the
+# "test" checks. Adding a job here does not gate merges on its own.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes the run already in flight for the same branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both Node versions still in long-term support: 22 (Jod) is the
+        # oldest package.json claims to support, 24 (Krypton) is current.
+        # Node 20 went end-of-life in April 2026 and is deliberately not here
+        # — CI should not vouch for a runtime that stopped getting patches.
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # The extension has no dependencies, so there is nothing to install:
+      # `npm test` runs the whole suite on the standard library alone. It also
+      # checks that src/extract/injected.js matches the sources it is built
+      # from, and that every golden file still matches what the parser makes
+      # of its fixture.
+      - run: npm test
+
+  lint:
+    name: web-ext lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Mozilla's own add-on validator: what AMO runs on submission.
+      - run: npm run lint

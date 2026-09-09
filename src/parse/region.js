@@ -15,6 +15,7 @@
 
 import { splitLines } from "./text.js";
 import { isChordOnlyLine, isLyricLine, isSectionLine, isMetadataLine, isTabShapedLine } from "./tabshape.js";
+import { findCallouts } from "./sections.js";
 
 // --------------------------------------------------------------------------
 // Tunable weights
@@ -119,9 +120,36 @@ function nextSolid(kinds, from) {
   return -1;
 }
 
+/**
+ * Classify every line, then promote the song's callouts to "section".
+ *
+ * classifyLine only knows the English, bracketed spellings. A tab that heads
+ * its parts "Estrofa" or "--- Intro ---" has callouts it reads as lyrics, and
+ * a lyric scores badly enough to be trimmed away — which used to cost the
+ * first part of the song its name. sections.js knows the rest of the
+ * spellings, so ask it.
+ *
+ * Only staves count as the music underneath, never chord lines: a heading
+ * above a stave is unmistakable, but a lone capitalised word above a column
+ * of chord names describes a page ("Chords", "Strumming") at least as often
+ * as it names a part of a song, and treating that as a heading is what makes
+ * a chord legend read as a song. A chord sheet's own English and bracketed
+ * headings are already caught by classifyLine.
+ */
+export function classifyLines(lines) {
+  const kinds = lines.map(classifyLine);
+  const staves = new Set();
+  kinds.forEach((kind, i) => {
+    if (kind === "tab") staves.add(i);
+  });
+  if (!staves.size) return kinds;
+  for (const callout of findCallouts(lines, staves)) kinds[callout.line] = "section";
+  return kinds;
+}
+
 /** Score every line. Higher means "more likely to be the song". */
 export function scoreLines(lines) {
-  const kinds = lines.map(classifyLine);
+  const kinds = classifyLines(lines);
   const supported = markSupportedChords(kinds);
   const anchored = kinds.map((kind, i) => (kind === "section" ? true : supported[i]));
   return kinds.map((kind, i) => {
@@ -179,7 +207,7 @@ export function bestRun(scores) {
  */
 export function findSongRegion(text) {
   const lines = splitLines(text);
-  const kinds = lines.map(classifyLine);
+  const kinds = classifyLines(lines);
   const scores = scoreLines(lines);
   const whole = { start: 0, end: lines.length - 1, trimmed: false };
   if (!lines.length) return whole;

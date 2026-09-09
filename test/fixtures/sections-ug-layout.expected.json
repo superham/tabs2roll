@@ -1,0 +1,40 @@
+{
+  "kind": "tab",
+  "title": "A Made Up Band - Some Song",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 5,
+  "chords": 0,
+  "unit": 1,
+  "totalBeats": 40,
+  "noteCount": 27,
+  "firstMidi": 40,
+  "lastMidi": 50,
+  "firstStart": 0.5,
+  "lastStart": 37,
+  "techniques": {},
+  "sections": [
+    "Verse 0-8",
+    "Chorus 8-16",
+    "Verse 2 (Rythm) 16-24",
+    "Verse 2 (Lead) 24-32",
+    "Outro 32-40"
+  ],
+  "tracks": {
+    "guitar": 27,
+    "lead": 27
+  }
+}

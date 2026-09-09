@@ -176,7 +176,9 @@ export function voiceChord(chord) {
  * rather than the shapes. (This is the same rule the tab parser applies to
  * open strings.)
  *
- * Returns { notes, chordCount, lineCount }.
+ * Returns { notes, chordCount, lineCount, placements }, where `placements`
+ * says which line each bar came from and when it plays — that is what
+ * parse/index needs to hang the sheet's callouts on the right beats.
  */
 export function parseChordSheet(text, options = {}) {
   const lines = splitLines(text);
@@ -184,21 +186,23 @@ export function parseChordSheet(text, options = {}) {
   const beatsPerBar = timeSignature[0] * (4 / timeSignature[1]);
   const capo = Number.isFinite(options.capo) ? Math.max(0, options.capo) : 0;
   const notes = [];
+  const placements = [];
   let bar = 0;
   let chordCount = 0;
   let lineCount = 0;
-  for (const line of lines) {
+  lines.forEach((line, index) => {
     const chords = chordLine(line);
-    if (!chords) continue;
+    if (!chords) return;
     lineCount++;
     for (const chord of chords) {
       const start = bar * beatsPerBar;
       for (const midi of voiceChord(chord)) {
         notes.push({ midi: midi + capo, start, length: beatsPerBar, velocity: 0.75, technique: null, chord: chord.name });
       }
+      placements.push({ firstLine: index, lastLine: index, start, length: beatsPerBar });
       bar++;
       chordCount++;
     }
-  }
-  return { notes, chordCount, lineCount, totalBeats: bar * beatsPerBar };
+  });
+  return { notes, chordCount, lineCount, totalBeats: bar * beatsPerBar, placements };
 }

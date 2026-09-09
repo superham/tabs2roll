@@ -26,6 +26,10 @@
   "firstStart": 0,
   "lastStart": 44,
   "techniques": {},
+  "sections": [
+    "Verse 0-32",
+    "Chorus 32-48"
+  ],
   "tracks": {
     "guitar": 48,
     "chords": 36,

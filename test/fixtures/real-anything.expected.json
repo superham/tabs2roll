@@ -1,0 +1,43 @@
+{
+  "kind": "tab",
+  "title": "Catfish and the Bottlemen - Anything",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    28,
+    33,
+    38,
+    43
+  ],
+  "tuningId": "bass",
+  "staves": 19,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 396,
+  "noteCount": 496,
+  "firstMidi": 42,
+  "lastMidi": 30,
+  "firstStart": 2.5,
+  "lastStart": 392,
+  "techniques": {
+    "slide": 23
+  },
+  "sections": [
+    "Verse 0-40",
+    "Chorus 40-84",
+    "Verse 2 84-144",
+    "Chorus 2 144-188",
+    "Bridge 188-252",
+    "Guitar Solo 252-312",
+    "Chorus 3 312-356",
+    "Verse 3 356-396"
+  ],
+  "tracks": {
+    "guitar": 496,
+    "lead": 496
+  }
+}

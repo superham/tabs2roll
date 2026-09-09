@@ -35,6 +35,7 @@
     "release": 1,
     "mute": 1
   },
+  "sections": [],
   "tracks": {
     "guitar": 15,
     "bass": 1,

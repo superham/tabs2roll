@@ -29,7 +29,7 @@ standard MIDI file you can open in your DAW.
 ## Try it (development)
 
 ```sh
-npm test            # unit tests + golden files + popup smoke test (Node 20+)
+npm test            # unit tests + golden files + popup smoke test (Node 22+)
 npm run dev         # web-ext run: opens Firefox with the extension loaded
 npm run lint        # web-ext lint
 npm run build       # regenerate src/extract/injected.js (see below)
@@ -47,6 +47,7 @@ install and shows how to pin the toolbar button.
 ```sh
 node tools/convert.js test/fixtures/ode-to-joy.txt out.mid
 node tools/convert.js my-tab.txt --tuning drop-d --step 1/16 --notes
+node tools/convert.js my-tab.txt out.mid --split-sections
 node tools/convert.js screenshot.png out.mid --show-tab
 ```
 
@@ -66,7 +67,9 @@ src/
     stitch.js   screenfuls -> one tab        which staves are whole, how far to scroll
   parse/        text -> IR                  pure, no DOM, no browser APIs
     region.js   whole page -> just the song (see below)
+    sections.js the song's callouts -> parts  (see below)
   arrange/      IR   -> IR + chord/bass/lead pure
+    sections.js IR   -> one track per part
   midi/         IR   -> Uint8Array          pure, hand-written SMF encoder
   pipeline.js   the three above in one call (used by the CLI and the extension)
   background.js event page: runs the pipeline, saves the file, opens onboarding
@@ -77,6 +80,8 @@ test/
   fixtures/     tab texts + golden files (see test/fixtures/README.md)
     pictures/   PNGs of tab + the tab each was drawn from
   helpers/draw.js  draws tablature, in a digit face the reader has never seen
+.github/
+  workflows/ci.yml  runs the suite and web-ext lint on every pull request
 tools/
   convert.js    CLI (text or PNG in, MIDI out)
   png.js        a PNG reader, so the CLI can be pointed at a screenshot
@@ -313,6 +318,25 @@ warn about reading data on websites, because the extension can only read the pag
 user clicked the button on. Settings and the "you just saved…" reminder use the
 extension's own `localStorage`, which needs no permission.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the whole suite on every pull request, on both Node
+versions still in long-term support — 22, the oldest `package.json` claims to support,
+and 24, the current one — plus `web-ext lint`, the same validator AMO runs on
+submission. Nothing here runs on Node in the end: `src/` imports no `node:` builtin at
+all, because the extension runs in Firefox. What the matrix is really checking is that
+the tests, the CLI and the build scripts work on the Node versions `engines` promises,
+which is a promise worth keeping true — the first CI run found that `npm test` had never
+worked on the floor it claimed at the time. There is nothing to install: the extension has no
+dependencies, so `npm test` runs on the standard library alone. The suite also checks
+that `src/extract/injected.js` matches the sources it is generated from and that every
+golden file still matches what the parser makes of its fixture, so a stale generated
+file or an unreviewed parser change fails the build.
+
+A workflow does not gate merges by itself. To make it one, go to **Settings → Branches**
+(or **Rules → Rulesets**) for `main`, turn on *Require status checks to pass before
+merging*, and select the `test (node 22)` and `test (node 24)` checks.
+
 ## Submitting to AMO
 
 - Set a real add-on id in `src/manifest.json` (`browser_specific_settings.gecko.id`);
@@ -322,12 +346,52 @@ extension's own `localStorage`, which needs no permission.
   committed file matches the build.
 - Package with `npx web-ext build --source-dir src`.
 
+### The parts of the song
+
+Almost every tab says where its parts begin, and almost none of them say it the same
+way:
+
+```
+[Intro/Verse]        Chorus:        -- Guitar solo --        CHORUS        Estribillo
+```
+
+`parse/sections.js` finds those callouts and `parse/index.js` hangs them on the beats the
+staves underneath landed on, so the IR carries `sections: [{ name, start, end }]`. Every
+file gets a MIDI marker at each one — that is where `[Chorus]` ends up visible along a
+DAW's ruler — and `--split-sections` (Settings: "Make a track for each part of the song")
+cuts every track at those boundaries, so the chorus is a track you can loop and the
+bridge is one you can drag elsewhere.
+
+The hard part is that there is no agreed spelling, no agreed layout and no agreed
+language, so a keyword list cannot be the mechanism — it is only a bonus. What carries it
+is shape and position: a short line, on its own, with music starting right underneath it.
+Every candidate is scored (`CALLOUT_SCORES`) and has to clear a threshold, which is what
+lets an unbracketed `Estribillo` in and keeps a lyric out. Two rules earn their keep:
+
+- **A line that reads like something someone sings needs an explicit mark.** In a chord
+  sheet *every* lyric is short, capitalised and sitting on top of music, so shape and
+  position say nothing there. Brackets, a drawn rule, a colon, or a label made of nothing
+  but section words ("Guitar solo") gets a sung-looking line in; nothing else does.
+- **A full stop is punctuation and one dash is not a rule.** Reading `Is on your outside.`
+  as a decorated heading turned every line of a chord sheet into a part of its own.
+
+A tab that marks nothing comes out exactly as it did before: no markers, one track.
+
 ## Decisions worth knowing about
 
 - **No framework, no bundler** for the popup and pages: plain HTML and JS modules, so
   the review surface is the source itself.
 - **Chords, bass and lead** are always generated (unless turned off in Settings). Two-note
   power chords count as chords for the pad; see the musical-decisions doc.
+- **Markers always, split tracks on request.** A marker costs nothing and cannot be wrong
+  in a way that loses notes, so the song's callouts are always written into the file.
+  Cutting the tracks up changes what a DAW shows on import, so that is a setting.
+- **A split part keeps its absolute beats.** A section track is not a loop rebased to
+  zero; it sits where it plays, so the parts line up on import exactly as the tab reads.
+- **The song-region trimmer asks the callout finder too**, but only about lines with a
+  stave under them. A heading above a stave is unmistakable; a lone capitalised word
+  above a column of chord names is `Chords` or `Strumming` — the page furniture the
+  trimmer exists to remove — at least as often as it is a part of a song.
 - **Capo** raises every string so the file sounds at the real pitch of the recording.
 - **Muted `x` strokes** become short, quiet notes at the open-string pitch, so strumming
   patterns keep their rhythm.

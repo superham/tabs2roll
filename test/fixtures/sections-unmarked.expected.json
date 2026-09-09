@@ -1,0 +1,39 @@
+{
+  "kind": "tab",
+  "title": "Cancion de ejemplo",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 4,
+  "chords": 0,
+  "unit": 1,
+  "totalBeats": 32,
+  "noteCount": 24,
+  "firstMidi": 40,
+  "lastMidi": 64,
+  "firstStart": 0.5,
+  "lastStart": 31,
+  "techniques": {},
+  "sections": [
+    "Estrofa 0-8",
+    "Estribillo 8-16",
+    "Estrofa 2 16-24",
+    "Puente 24-32"
+  ],
+  "tracks": {
+    "guitar": 24,
+    "lead": 24
+  }
+}
