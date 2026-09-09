@@ -26,8 +26,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The oldest Node package.json claims to support, and current.
-        node: ["20", "22"]
+        # Both Node versions still in long-term support: 22 (Jod) is the
+        # oldest package.json claims to support, 24 (Krypton) is current.
+        # Node 20 went end-of-life in April 2026 and is deliberately not here
+        # — CI should not vouch for a runtime that stopped getting patches.
+        node: ["22", "24"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

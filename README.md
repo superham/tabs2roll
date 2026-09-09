@@ -29,7 +29,7 @@ standard MIDI file you can open in your DAW.
 ## Try it (development)
 
 ```sh
-npm test            # unit tests + golden files + popup smoke test (Node 20+)
+npm test            # unit tests + golden files + popup smoke test (Node 22+)
 npm run dev         # web-ext run: opens Firefox with the extension loaded
 npm run lint        # web-ext lint
 npm run build       # regenerate src/extract/injected.js (see below)
@@ -320,9 +320,14 @@ extension's own `localStorage`, which needs no permission.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs the whole suite on every pull request, on Node 20 (the
-oldest `package.json` claims to support) and Node 22, plus `web-ext lint` — the same
-validator AMO runs on submission. There is nothing to install: the extension has no
+`.github/workflows/ci.yml` runs the whole suite on every pull request, on both Node
+versions still in long-term support — 22, the oldest `package.json` claims to support,
+and 24, the current one — plus `web-ext lint`, the same validator AMO runs on
+submission. Nothing here runs on Node in the end: `src/` imports no `node:` builtin at
+all, because the extension runs in Firefox. What the matrix is really checking is that
+the tests, the CLI and the build scripts work on the Node versions `engines` promises,
+which is a promise worth keeping true — the first CI run found that `npm test` had never
+worked on the floor it claimed at the time. There is nothing to install: the extension has no
 dependencies, so `npm test` runs on the standard library alone. The suite also checks
 that `src/extract/injected.js` matches the sources it is generated from and that every
 golden file still matches what the parser makes of its fixture, so a stale generated
@@ -330,7 +335,7 @@ file or an unreviewed parser change fails the build.
 
 A workflow does not gate merges by itself. To make it one, go to **Settings → Branches**
 (or **Rules → Rulesets**) for `main`, turn on *Require status checks to pass before
-merging*, and select the `test (node 20)` and `test (node 22)` checks.
+merging*, and select the `test (node 22)` and `test (node 24)` checks.
 
 ## Submitting to AMO
 
