@@ -1,0 +1,42 @@
+{
+  "kind": "tab",
+  "title": "",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    28,
+    33,
+    38,
+    43
+  ],
+  "tuningId": "bass",
+  "staves": 21,
+  "chords": 0,
+  "unit": 4,
+  "totalBeats": 272,
+  "noteCount": 313,
+  "firstMidi": 28,
+  "lastMidi": 40,
+  "firstStart": 0,
+  "lastStart": 270.5,
+  "techniques": {
+    "hammer": 11
+  },
+  "sections": [
+    "Intro 0-16",
+    "Verse 1 16-84",
+    "Chorus 84-120",
+    "Verse 2 120-168",
+    "Chorus 2 168-204",
+    "Verse 3 204-236",
+    "Chorus 3 236-272"
+  ],
+  "tracks": {
+    "guitar": 313,
+    "lead": 313
+  }
+}

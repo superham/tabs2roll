@@ -1,0 +1,39 @@
+{
+  "kind": "tab",
+  "title": "Why'd You Only Call Me When You're High?",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    28,
+    33,
+    38,
+    43
+  ],
+  "tuningId": "bass",
+  "staves": 15,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 120,
+  "noteCount": 141,
+  "firstMidi": 30,
+  "lastMidi": 30,
+  "firstStart": 0,
+  "lastStart": 116,
+  "techniques": {},
+  "sections": [
+    "Intro/Verse 0-8",
+    "Chorus 8-32",
+    "Verse 2 32-56",
+    "Chorus 2 56-88",
+    "Bridge 88-104",
+    "Ending 104-120"
+  ],
+  "tracks": {
+    "guitar": 141,
+    "lead": 141
+  }
+}

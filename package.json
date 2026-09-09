@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
+    "test": "node --test test/*.test.js",
     "build": "node tools/build-injected.js",
     "dev": "npm run build && npx web-ext run --source-dir src",
     "lint": "npx web-ext lint --source-dir src",

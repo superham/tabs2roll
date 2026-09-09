@@ -1,0 +1,34 @@
+{
+  "kind": "tab",
+  "title": "",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    45,
+    50,
+    55,
+    60,
+    64,
+    69
+  ],
+  "tuningId": "standard",
+  "staves": 1,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 16,
+  "noteCount": 18,
+  "firstMidi": 57,
+  "lastMidi": 60,
+  "firstStart": 0,
+  "lastStart": 13.5,
+  "techniques": {},
+  "sections": [],
+  "tracks": {
+    "guitar": 18,
+    "lead": 18
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "tab",
+  "title": "Flycatcher - Games",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    39,
+    46,
+    53,
+    58,
+    62,
+    65
+  ],
+  "tuningId": null,
+  "staves": 7,
+  "chords": 0,
+  "unit": 2,
+  "totalBeats": 176,
+  "noteCount": 644,
+  "firstMidi": 62,
+  "lastMidi": 41,
+  "firstStart": 0,
+  "lastStart": 172,
+  "techniques": {},
+  "sections": [
+    "Intro 0-24",
+    "Verse 1 24-48",
+    "Chorus 1 48-76",
+    "Verse 2 (Rythm) 76-100",
+    "Verse 2 (Lead) 100-120",
+    "Chorus 2 120-148",
+    "Outro 148-176"
+  ],
+  "tracks": {
+    "guitar": 644,
+    "chords": 586,
+    "bass": 224
+  }
+}

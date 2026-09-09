@@ -24,6 +24,22 @@ made up, like the rest of the fixtures here. The `sections` field of every golde
 records what was found, so a change to the scoring shows up across all the fixtures at
 once.
 
+The `real-*.txt` files are different again, and are the only fixtures here that were
+not written for the tests: they are five real tabs, copied off Ultimate Guitar and left
+as they came, with the name of whoever typed each one out removed. They exist because
+every one of them caught something the invented fixtures did not. `real-anything.txt`
+brackets the words about to be sung as well as the part being played, one right under
+the other, so brackets alone cannot tell a heading from a lyric. `real-games.txt` hangs
+qualifiers off its headings (`[Verse 2] (Rythm):` and `[Verse 2] (Lead):` are two
+different parts) and puts a `Strumming:Down` field between every heading and its stave.
+`real-sasquatch.txt` prints its headings twice — once over the tab, then again over the
+words with no tab under them — and has no title line at all. `real-souls-of-fire.txt`
+has a single `[Intro]` and must therefore stay one track. `real-only-call-me.txt` is a
+straightforward, well-marked bass tab: the case that has to keep working.
+
+Their song words are the tabbers' own transcriptions and are kept only because they are
+what the parser has to read past; nothing here is a distribution of the songs.
+
 The two `page-*.txt` files are different: they are whole web pages as a person would
 get them by selecting everything and copying, navigation and footer included. They
 exist to pin the behaviour of `src/parse/region.js`, which cuts a page down to the

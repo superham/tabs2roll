@@ -80,6 +80,8 @@ test/
   fixtures/     tab texts + golden files (see test/fixtures/README.md)
     pictures/   PNGs of tab + the tab each was drawn from
   helpers/draw.js  draws tablature, in a digit face the reader has never seen
+.github/
+  workflows/ci.yml  runs the suite and web-ext lint on every pull request
 tools/
   convert.js    CLI (text or PNG in, MIDI out)
   png.js        a PNG reader, so the CLI can be pointed at a screenshot
@@ -315,6 +317,20 @@ says the same thing to users.
 warn about reading data on websites, because the extension can only read the page the
 user clicked the button on. Settings and the "you just saved…" reminder use the
 extension's own `localStorage`, which needs no permission.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the whole suite on every pull request, on Node 20 (the
+oldest `package.json` claims to support) and Node 22, plus `web-ext lint` — the same
+validator AMO runs on submission. There is nothing to install: the extension has no
+dependencies, so `npm test` runs on the standard library alone. The suite also checks
+that `src/extract/injected.js` matches the sources it is generated from and that every
+golden file still matches what the parser makes of its fixture, so a stale generated
+file or an unreviewed parser change fails the build.
+
+A workflow does not gate merges by itself. To make it one, go to **Settings → Branches**
+(or **Rules → Rulesets**) for `main`, turn on *Require status checks to pass before
+merging*, and select the `test (node 20)` and `test (node 22)` checks.
 
 ## Submitting to AMO
 
