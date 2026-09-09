@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "tab2roll",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Turns the guitar tab on this page \u2014 written out, or drawn as sheet music \u2014 into a MIDI file for your DAW. No accounts, no network, nothing leaves your computer.",
   "homepage_url": "https://github.com/superham/tabs2roll",
   "browser_specific_settings": {
@@ -9,21 +9,13 @@
       "id": "tab2roll@placeholder.invalid",
       "strict_min_version": "115.0",
       "data_collection_permissions": {
-        "required": [
-          "none"
-        ]
+        "required": ["none"]
       }
     }
   },
-  "permissions": [
-    "downloads",
-    "activeTab",
-    "scripting"
-  ],
+  "permissions": ["downloads", "activeTab", "scripting"],
   "background": {
-    "scripts": [
-      "background.js"
-    ]
+    "scripts": ["background.js"]
   },
   "action": {
     "default_title": "tab2roll \u2014 send this tab to my DAW",
