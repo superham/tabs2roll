@@ -47,7 +47,7 @@ install and shows how to pin the toolbar button.
 ```sh
 node tools/convert.js test/fixtures/ode-to-joy.txt out.mid
 node tools/convert.js my-tab.txt --tuning drop-d --step 1/16 --notes
-node tools/convert.js my-tab.txt out.mid --split-sections
+node tools/convert.js my-tab.txt out.mid --no-split-sections
 node tools/convert.js screenshot.png out.mid --show-tab
 ```
 
@@ -358,9 +358,12 @@ way:
 `parse/sections.js` finds those callouts and `parse/index.js` hangs them on the beats the
 staves underneath landed on, so the IR carries `sections: [{ name, start, end }]`. Every
 file gets a MIDI marker at each one — that is where `[Chorus]` ends up visible along a
-DAW's ruler — and `--split-sections` (Settings: "Make a track for each part of the song")
-cuts every track at those boundaries, so the chorus is a track you can loop and the
-bridge is one you can drag elsewhere.
+DAW's ruler — and the tabbed track is cut at those boundaries, so the chorus is a track
+you can loop and the bridge is one you can drag elsewhere. Only the tab itself is cut:
+the chords, bass and lead the arranger invents stay whole underneath, because a six-part
+song split four ways is twenty-four tracks and worse to open than the one it replaced.
+`--no-split-sections` (Settings: "Make a track for each part of the song") turns it off
+and gives you the one long track.
 
 The hard part is that there is no agreed spelling, no agreed layout and no agreed
 language, so a keyword list cannot be the mechanism — it is only a bonus. What carries it
@@ -383,9 +386,14 @@ A tab that marks nothing comes out exactly as it did before: no markers, one tra
   the review surface is the source itself.
 - **Chords, bass and lead** are always generated (unless turned off in Settings). Two-note
   power chords count as chords for the pad; see the musical-decisions doc.
-- **Markers always, split tracks on request.** A marker costs nothing and cannot be wrong
-  in a way that loses notes, so the song's callouts are always written into the file.
-  Cutting the tracks up changes what a DAW shows on import, so that is a setting.
+- **A song with parts arrives in parts.** Someone who asks for a track per section does
+  not want to find a checkbox first, so splitting is on by default and markers are
+  always written; a tab that marks nothing is unaffected either way. Turning it off is
+  the setting, not turning it on.
+- **Only the tabbed track is cut.** Multiplying every role by every part is how a
+  six-part song becomes twenty-four tracks. The part worth looping is the one that was
+  actually tabbed; the arranger's chords, bass and lead read better as continuous tracks
+  underneath, and the markers label the parts across all of them anyway.
 - **A split part keeps its absolute beats.** A section track is not a loop rebased to
   zero; it sits where it plays, so the parts line up on import exactly as the tab reads.
 - **The song-region trimmer asks the callout finder too**, but only about lines with a

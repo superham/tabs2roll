@@ -147,8 +147,9 @@ export const STRINGS = {
 
     partsHeading: "The parts of the song",
     parts1: "Tabs mark their parts as they go — \"[Intro]\", \"Chorus:\", \"-- Guitar solo --\", or whatever the person who wrote it out reached for, in whatever language. tab2roll finds those callouts and puts a marker at each one, so your DAW shows the song laid out along the ruler instead of one long take.",
-    parts2: "Turn on \"Make a track for each part of the song\" in Settings and it goes further: every part becomes a track of its own, sitting where it plays, so you can loop the chorus or drag the bridge somewhere else without cutting anything up first.",
+    parts2: "It goes further than the markers: every part arrives as a track of its own, sitting where it plays, so you can loop the chorus or drag the bridge somewhere else without cutting anything up first. Only the tab itself is split this way — the chords, bass and lead tracks stay whole underneath, because a six-part song split four ways is twenty-four tracks and no easier to work with than the one it replaced. To get the tab as one long track instead, turn off \"Make a track for each part of the song\" in Settings.",
     parts3: "A tab that never says where its parts are comes out as one track, exactly as it did before.",
+    parts4: "Each track is named for its part and then the instrument — \"Intro/Verse - Guitar\", \"Bridge - Guitar\" — so your DAW lists the song in its own order instead of six lines that all start the same way. The part names come from the tab, so they are whatever the person who wrote it out called them, and two parts with the same name are numbered so nothing is called the same thing twice.",
 
     timingHeading: "The timing sounds off",
     timing1: "Plain-text tab has no timing in it, so tab2roll makes a best guess: evenly spaced notes become evenly spaced eighth notes, and bar lines line up with bars.",
@@ -196,7 +197,7 @@ export const STRINGS = {
     arrangeHint: "Turn this off to get only the guitar track, exactly as tabbed.",
     partsHeading: "Parts of the song",
     splitLabel: "Make a track for each part of the song",
-    splitHint: "Most tabs mark their parts — \"[Intro]\", \"Chorus\", \"Estribillo\". Turn this on and each one becomes its own track, ready to loop and rearrange. Either way the parts are marked along the top of your DAW, and a tab that marks nothing comes out as one track as before.",
+    splitHint: "Most tabs mark their parts — \"[Intro]\", \"Chorus\", \"Estribillo\" — and each one arrives as its own track, ready to loop and move around. Turn this off to get the tab as one long track instead. Either way the parts are marked along the top of your DAW, and a tab that marks nothing comes out as one track.",
     saved: "Saved.",
     resetButton: "Back to defaults",
   },

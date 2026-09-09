@@ -198,7 +198,7 @@ test("sections reach back to the start and on to the end, so no note is lost", (
   assert.equal(ranges[1].to, Infinity);
 });
 
-test("splitBySection cuts every track and keeps the beats where they were", () => {
+test("splitBySection cuts the tab and leaves the arranger's tracks whole", () => {
   const ir = {
     sections: [
       { name: "Intro", start: 0, end: 4 },
@@ -207,20 +207,41 @@ test("splitBySection cuts every track and keeps the beats where they were", () =
     tracks: [
       { role: "guitar", notes: [note(0), note(2), note(4), note(9)] },
       { role: "lead", notes: [note(5)] },
+      { role: "bass", notes: [note(1), note(6)] },
     ],
   };
   const out = splitBySection(ir);
+  // Only the tabbed track is cut up. Cutting every role turns a six-part song
+  // with a full arrangement into twenty-four tracks, which is worse to open
+  // than the one track it replaced.
   assert.deepEqual(
-    out.tracks.map((t) => [t.role, t.section, t.notes.length]),
+    out.tracks.map((t) => [t.role, t.section || null, t.notes.length]),
     [
       ["guitar", "Intro", 2],
       ["guitar", "Chorus", 2], // the note at beat 9 is past the last heading
-      ["lead", "Chorus", 1],
+      ["lead", null, 1],
+      ["bass", null, 2],
     ],
   );
   // Absolute beats, not loops rebased to zero.
   assert.deepEqual(out.tracks[1].notes.map((n) => n.start), [4, 9]);
   assert.equal(ir.tracks[0].notes.length, 4, "the input is left alone");
+});
+
+test("nothing to cut means nothing is cut, and no track claims a part", () => {
+  // The arranger's roles are not split, so an IR holding only those comes
+  // back exactly as it went in — which is what lets the summary report
+  // whether a file really was split by looking at the tracks themselves.
+  const ir = {
+    sections: [
+      { name: "Intro", start: 0, end: 4 },
+      { name: "Chorus", start: 4, end: 8 },
+    ],
+    tracks: [{ role: "chords", notes: [note(0), note(5)] }],
+  };
+  const out = splitBySection(ir);
+  assert.deepEqual(out.tracks, ir.tracks);
+  assert.ok(!out.tracks.some((t) => t.section));
 });
 
 test("a song with one part comes back whole", () => {
@@ -279,13 +300,13 @@ test("the callouts become markers in the file, whether or not it is split", () =
   ]);
 });
 
-test("splitSections gives a DAW one named track per part, in playing order", () => {
+test("a track is named for its part first, then the instrument", () => {
   const { bytes, summary } = convertText(TAB, { arrange: false, splitSections: true });
   const tracks = readMidi(bytes).tracks.slice(1);
   assert.deepEqual(tracks.map((t) => t.name), [
-    "Guitar (as tabbed) - Intro",
-    "Guitar (as tabbed) - Estribillo",
-    "Guitar (as tabbed) - Guitar solo",
+    "Intro - Guitar",
+    "Estribillo - Guitar",
+    "Guitar solo - Guitar",
   ]);
   assert.ok(tracks.every((t) => t.notes.length > 0), "no empty tracks");
   assert.equal(summary.splitSections, true);
@@ -293,7 +314,7 @@ test("splitSections gives a DAW one named track per part, in playing order", () 
 });
 
 test("splitting loses no notes and moves none of them", () => {
-  const whole = convertText(TAB, { arrange: false });
+  const whole = convertText(TAB, { arrange: false, splitSections: false });
   const split = convertText(TAB, { arrange: false, splitSections: true });
   const starts = (r) => r.ir.tracks.flatMap((t) => t.notes.map((n) => n.start)).sort((a, b) => a - b);
   assert.deepEqual(starts(split), starts(whole));
@@ -326,9 +347,35 @@ E|-----------------|
   const file = readMidi(bytes);
   assert.deepEqual(file.tracks[0].markers.map((m) => m.text), ["前奏", "припев"]);
   assert.deepEqual(file.tracks.slice(1).map((t) => t.name), [
-    "Guitar (as tabbed) - 前奏",
-    "Guitar (as tabbed) - припев",
+    "前奏 - Guitar",
+    "припев - Guitar",
   ]);
+});
+
+test("a marked-up tab arrives split, without anyone having to ask", () => {
+  // The default used to be off, so the parts were found, written as markers,
+  // and then handed over as one track anyway — which is not what someone who
+  // asked for a track per part expects to open.
+  const { summary } = convertText(TAB, { arrange: false });
+  assert.equal(summary.splitSections, true);
+  assert.deepEqual(summary.trackNames, [
+    "Intro - Guitar",
+    "Estribillo - Guitar",
+    "Guitar solo - Guitar",
+  ]);
+});
+
+test("the summary reports what happened, not what was asked for", () => {
+  // Splitting asked for, but a tab with no callouts has nothing to split.
+  const plain = "e|--0--2--3--2--0--|\nB|-----------------|\nG|-----------------|\nD|-----------------|\nA|-----------------|\nE|-----------------|\n";
+  const { summary } = convertText(plain, { arrange: false, splitSections: true });
+  assert.equal(summary.splitSections, false);
+});
+
+test("...and splitSections: false still gets you the one long track", () => {
+  const { summary } = convertText(TAB, { arrange: false, splitSections: false });
+  assert.equal(summary.splitSections, false);
+  assert.deepEqual(summary.trackNames, ["Guitar (as tabbed)"]);
 });
 
 test("a tab with no callouts is left as one track, as it always was", () => {

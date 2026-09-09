@@ -237,7 +237,11 @@ label is numbered ("Chorus", "Chorus 2") so every part has a name of its own. Mu
 before the first callout becomes `DEFAULT_SECTION_NAME` ("Start"). Fewer than two parts
 means there is nothing to tell apart, and no sections are reported at all.
 
-`splitBySection()` then cuts every track at those boundaries. A section track keeps its
+`splitBySection()` then cuts the tabbed track at those boundaries, and only that one:
+`SPLIT_ROLES` is `["guitar"]`. Cutting every role multiplies tracks by parts, so a
+six-part song with the full arrangement arrives as twenty-four tracks — worse to open
+than the single track it replaced — and the part anyone actually wants to loop is the
+one that was tabbed. A section track keeps its
 **absolute** beats rather than being rebased to zero, so the parts line up on import
 exactly as the tab reads, and the first and last sections reach to -∞ and +∞ so no note
 can fall between two of them and be lost.
@@ -265,8 +269,10 @@ this order and only when they have notes: "Guitar (as tabbed)" (program 27, chan
 zero-based General MIDI values. At the same tick, note-offs are written before note-ons
 so a repeated pitch re-triggers.
 
-When the tracks are split by section, each role keeps its program and channel and every
-one of its parts is written as its own track, in playing order, named
-"Guitar (as tabbed) - Chorus 2". Markers are written either way: they cost nothing and
-cannot lose a note, whereas cutting the tracks up changes what a DAW shows on import, so
-that stays a setting.
+When the tracks are split by section, the tabbed role keeps its program and channel and
+every one of its parts is written as its own track, in playing order, named for the
+part and then the instrument —
+"Chorus 2 - Guitar"; the arranger's tracks follow it whole. Both are on by
+default — a song with parts arrives in parts, because someone who wants a track per
+section should not have to find a setting first — and `splitSections: false` gives back
+the one long track. Markers are written either way.

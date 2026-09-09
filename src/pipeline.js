@@ -19,8 +19,8 @@ export { ParseError };
  *   tuningId       force a named tuning (dropdown choice)
  *   step           "1/4" | "1/8" | "1/16"
  *   arrange        false to skip the chords/bass/lead tracks (default true)
- *   splitSections  true to cut every track into one track per part of the
- *                  song, using the tab's own callouts (default false)
+ *   splitSections  false to keep the tabbed track whole instead of cutting
+ *                  it into one track per part of the song (default true)
  *   filenameSuffix e.g. the tuning label when the user re-did the conversion
  *
  * Returns { ir, bytes, filename, summary } where summary is what the UI
@@ -38,9 +38,11 @@ export { ParseError };
 export function convertText(text, options = {}) {
   const parsed = parseText(text, options);
   const arranged = options.arrange === false ? parsed : arrange(parsed);
-  // Splitting comes last so every track the arranger made is cut along the
-  // same lines as the one it was made from.
-  const ir = options.splitSections ? splitBySection(arranged) : arranged;
+  // Splitting comes last, so it cuts the tabbed track after the arranger has
+  // read it whole — the chords and bassline are derived from the whole
+  // performance, not from one part at a time. Only the tab is cut; see
+  // SPLIT_ROLES.
+  const ir = options.splitSections === false ? arranged : splitBySection(arranged);
   const bytes = encodeMidi(ir);
   const filename = buildFilename(ir, options.filenameSuffix || "");
   const guitarNotes = ir.tracks.filter((t) => t.role === "guitar").flatMap((t) => t.notes);
@@ -55,7 +57,10 @@ export function convertText(text, options = {}) {
     tracks: roleNames(ir),
     trackNames: trackNames(ir),
     sections: (ir.sections || []).map((s) => s.name),
-    splitSections: Boolean(options.splitSections) && (ir.sections || []).length > 1,
+    // Read off the result, not off the request: asking to split a tab that
+    // has nothing to split leaves the tracks whole, and the summary should
+    // say so. A track carries `section` only if it was actually cut.
+    splitSections: ir.tracks.some((t) => t.section),
     noteCount: guitarNotes.length,
     staves: ir.info ? ir.info.staves : 0,
     chords: ir.info ? ir.info.chords : 0,
