@@ -36,13 +36,16 @@ export function readPng(bytes) {
   let header = null;
   let palette = null;
   let transparency = null;
+  let ended = false;
   const data = [];
 
   while (at + 8 <= bytes.length) {
     const length = view.getUint32(at);
     const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
     const start = at + 8;
-    if (start + length > bytes.length) break;
+    // Body plus the four-byte CRC that follows it. A file cut short after the
+    // body would otherwise pass as a whole chunk and decode to nonsense.
+    if (start + length + 4 > bytes.length) break;
     if (type === "IHDR") {
       header = {
         width: view.getUint32(start),
@@ -58,12 +61,18 @@ export function readPng(bytes) {
     } else if (type === "IDAT") {
       data.push(bytes.subarray(start, start + length));
     } else if (type === "IEND") {
+      ended = true;
       break;
     }
     at = start + length + 4;
   }
 
   if (!header) throw new Error("that PNG has no header in it");
+  // Reaching the end marker is the only proof the file is all here. Without
+  // it a PNG cut short anywhere past its last full chunk — including one
+  // missing nothing but the end marker's own checksum — would decode to a
+  // picture that looks whole and is not.
+  if (!ended) throw new Error("that PNG stops before its end marker; the file is cut short");
   if (header.interlace) throw new Error("that PNG is interlaced, which this reader does not handle; save it again without interlacing");
   const channels = CHANNELS[header.colour];
   if (!channels) throw new Error(`that PNG uses a colour type this reader does not handle (${header.colour})`);

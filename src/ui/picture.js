@@ -32,6 +32,9 @@ export async function imageDataFromFile(file) {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
+    // Null when the browser will not give us a 2D context at all. Saying so
+    // here beats the "cannot read properties of null" the next line would throw.
+    if (!context) throw new Error("this browser would not open a canvas to read the picture with");
     context.drawImage(bitmap, 0, 0, width, height);
     return context.getImageData(0, 0, width, height);
   } finally {

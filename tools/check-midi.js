@@ -34,6 +34,23 @@ const u8 = () => {
 const u16 = () => (u8() << 8) | u8();
 const u32 = () => ((u8() << 24) | (u8() << 16) | (u8() << 8) | u8()) >>> 0;
 const tag = () => String.fromCharCode(u8(), u8(), u8(), u8());
+/**
+ * Meta text as characters.
+ *
+ * Spreading the bytes into String.fromCharCode blows the call stack on a long
+ * one, and a long one is legal: the length is a variable-quantity number, so a
+ * track name may be as big as the file. Only the bytes the report can show are
+ * decoded, one more than that so the ellipsis knows whether it is needed, so a
+ * name the size of the file costs no more than a short one. Decoded byte for
+ * byte rather than as UTF-8, because a text meta event is bytes and this tool
+ * reports what is in the file rather than guessing at an encoding for it.
+ */
+const MAX_TEXT = 120;
+const textOf = (data) => {
+  const text = data.toString("latin1", 0, MAX_TEXT + 1);
+  return text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) + "…" : text;
+};
+
 const vlq = () => {
   let v = 0;
   for (let i = 0; i < 4; i++) {
@@ -59,12 +76,18 @@ function readTrack(index) {
   const open = new Map();
   let tick = 0;
   let running = null;
+  // Set when parsing gives up part way through the track. Whatever is left
+  // unread after that is a consequence of the fault already reported, so
+  // saying the track has no end or has notes still held open would be noise
+  // on top of the one message that names what actually went wrong.
+  let stopped = false;
   while (pos < end) {
     tick += vlq();
     let status = bytes[pos];
     if (status < 0x80) {
       if (running === null) {
         problems.push(`track ${index}: an event at ${tick} carries no status byte and none came before it`);
+        stopped = true;
         break;
       }
       status = running;
@@ -73,9 +96,17 @@ function readTrack(index) {
     if (status === 0xff) {
       const type = u8();
       const length2 = vlq();
+      // A length that runs past the chunk would otherwise read the next
+      // track's bytes as though they belonged to this one — its name, its
+      // end-of-track event and all — and report that muddle instead of this.
+      if (length2 > end - pos) {
+        problems.push(`track ${index}: a meta event at ${tick} claims ${length2} bytes, with only ${end - pos} left in the track`);
+        stopped = true;
+        break;
+      }
       const data = bytes.subarray(pos, pos + length2);
       pos += length2;
-      if (type === 0x03 && track.name === null) track.name = String.fromCharCode(...data);
+      if (type === 0x03 && track.name === null) track.name = textOf(data);
       if (type === 0x2f) {
         track.ended = true;
         track.endTick = tick;
@@ -84,7 +115,13 @@ function readTrack(index) {
       if (showEvents) console.log(`  track ${index} @${tick} meta ${type.toString(16).padStart(2, "0")} (${length2} bytes)`);
       running = null;
     } else if (status === 0xf0 || status === 0xf7) {
-      pos += vlq();
+      const length2 = vlq();
+      if (length2 > end - pos) {
+        problems.push(`track ${index}: a system-exclusive event at ${tick} claims ${length2} bytes, with only ${end - pos} left in the track`);
+        stopped = true;
+        break;
+      }
+      pos += length2;
       running = null;
     } else {
       running = status;
@@ -107,6 +144,10 @@ function readTrack(index) {
     if (tick > track.endTick) track.endTick = tick;
   }
   track.hanging = open.size;
+  if (stopped) {
+    pos = end;
+    return track;
+  }
   if (pos !== end) {
     problems.push(`track ${index}: read ${pos - start} bytes of the ${length} it claims`);
     pos = end;
@@ -120,10 +161,15 @@ let header;
 try {
   const chunk = tag();
   const length = u32();
+  const headerStart = pos;
   if (chunk !== "MThd") problems.push(`the file does not start with MThd (it starts with "${chunk}")`);
   if (length < 6) problems.push(`the header claims ${length} bytes; it needs at least 6`);
+  if (length > bytes.length - pos) problems.push(`the header claims ${length} bytes, with only ${bytes.length - pos} left in the file`);
   header = { format: u16(), trackCount: u16(), division: u16() };
-  pos += length - 6;
+  // Where the header says it ends, but never off the end of the file and
+  // never behind where it started: a length under six would otherwise wind
+  // the reader backwards into bytes it has already read.
+  pos = Math.min(headerStart + Math.max(length, 6), bytes.length);
   if (header.format > 2) problems.push(`unknown file format ${header.format}`);
   if (header.division === 0) problems.push("the header gives no timing");
   if (header.division & 0x8000) problems.push("the file is timed in frames per second, which most DAWs will not import");
