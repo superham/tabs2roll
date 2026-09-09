@@ -174,6 +174,22 @@ dropped as furniture is worse than one the user is told to check. The letterform
 reader knows are deliberately few (T and A, for the word written down the front of a tab
 staff): a letter earns its place there only when it cannot be mistaken for a digit.
 
+### Reading past the bottom of the screen (`src/read/stitch.js`)
+
+A player draws the bars that are on screen and no more, so a whole song is read a screenful
+at a time and joined up. Two numbers decide how.
+
+| What | Constant | Value | Why |
+|---|---|---|---|
+| A staff is whole | `EDGE_MARGIN` | a whole line spacing of clear picture below its last line | Staff lines are evenly spaced, so a clear spacing with no line in it means the staff really ended there; less than one means the next line could be sitting just off the bottom of the screen. Six lines cut down to four still group as a staff — a bass, to look at it — and would come back as music nobody played, on strings the guitar does not have. |
+| ...at the top of the picture | — | never trimmed | The scroll is worked out to land the next staff hard against the top of the next picture. Trimming there would throw away the bars the scroll was made to reach, every time, all the way down. The asymmetry is the point. |
+| How far to scroll | `readTo()` | just past the bottom of the last whole staff | Nothing is read twice and nothing on the fold is lost, so the screenfuls join by concatenation with no overlap to reconcile. Picture pixels become the page's own through the scale each reading carries: a canvas knows it from where it sits on screen against how big its buffer is, which on an ordinary laptop is two buffer pixels for each of the page's. |
+| When to stop | `MAX_SCREENFULS` = 40 | or the scroller says it is at the end, or it will not move | A long song is a dozen screenfuls. Anything near forty means the page is not moving the way we think it is, and grinding on would not make it. |
+
+A screenful that comes back word for word the same as the one before it is dropped as a
+page that did not move, rather than kept as a song that repeats itself: a real repeat is
+engraved again further down and arrives with different bars either side of it.
+
 ## Arranging (`src/arrange/index.js`)
 
 | What | Constant | Value | Why |

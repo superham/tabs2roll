@@ -64,16 +64,24 @@ function matches(node, selectorList) {
   });
 }
 
-export function document({ hostname = "example.com", title = "", head = [], body = [] } = {}) {
+export function document({ hostname = "example.com", title = "", head = [], body = [], view = { width: 1280, height: 900, dpr: 1 } } = {}) {
   const headEl = el("head", {}, head);
   const bodyEl = el("body", {}, body);
   const html = el("html", {}, [headEl, bodyEl]);
+  // The extractor measures where things are on the screen, so the fake page
+  // has to have a size. Pass view: null for a document with no window at all,
+  // which is what a page being read out of a background context looks like.
+  if (view) {
+    html.clientWidth = view.width;
+    html.clientHeight = view.height;
+  }
   return {
     title,
     location: { hostname },
     body: bodyEl,
     head: headEl,
     documentElement: html,
+    defaultView: view ? { innerWidth: view.width, innerHeight: view.height, devicePixelRatio: view.dpr || 1 } : null,
     querySelectorAll: (s) => html.querySelectorAll(s),
     querySelector: (s) => html.querySelector(s),
   };
