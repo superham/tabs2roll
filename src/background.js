@@ -83,7 +83,7 @@ async function handleConvert(message) {
       tuningId: options.tuningId || undefined,
       step: options.step || undefined,
       arrange: options.arrange !== false,
-      splitSections: options.splitSections === true,
+      splitSections: options.splitSections !== false,
       filenameSuffix: options.filenameSuffix || "",
     });
   } catch (err) {

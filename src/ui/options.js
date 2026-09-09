@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 function render(options) {
   $("step").value = options.step;
   $("arrange").checked = options.arrange !== false;
-  $("split-sections").checked = options.splitSections === true;
+  $("split-sections").checked = options.splitSections !== false;
 }
 
 function save() {

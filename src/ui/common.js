@@ -45,7 +45,7 @@ export function writeStore(key, value) {
 }
 
 /** Options with their defaults. The happy path never needs these changed. */
-export const DEFAULT_OPTIONS = Object.freeze({ step: "1/8", arrange: true, splitSections: false });
+export const DEFAULT_OPTIONS = Object.freeze({ step: "1/8", arrange: true, splitSections: true });
 
 export function getOptions() {
   const stored = readStore("options", {});

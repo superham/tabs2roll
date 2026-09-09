@@ -11,7 +11,8 @@
 //   --step <s>        1/4 | 1/8 | 1/16      (timing step, default 1/8)
 //   --tempo <bpm>     override the tempo
 //   --no-arrange      only the literal guitar track
-//   --split-sections  one track per part of the song, cut at the tab's callouts
+//   --no-split-sections  keep the tabbed track whole instead of cutting it
+//                        into one track per part of the song
 //   --title <t>  --artist <a>
 //   --notes           print every note of the guitar track
 //   --show-tab        print the tab read off a picture
@@ -33,6 +34,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--no-arrange") args.arrange = false;
     else if (a === "--split-sections") args.splitSections = true;
+    else if (a === "--no-split-sections") args.splitSections = false;
     else if (a === "--notes") args.notes = true;
     else if (a === "--show-tab") args.showTab = true;
     else if (a === "--json") args.json = true;
@@ -44,7 +46,7 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args._.length) {
-  console.error("usage: node tools/convert.js <tab.txt | picture.png> [out.mid] [--tuning id] [--step 1/8] [--tempo bpm] [--no-arrange] [--split-sections] [--notes] [--show-tab] [--json]");
+  console.error("usage: node tools/convert.js <tab.txt | picture.png> [out.mid] [--tuning id] [--step 1/8] [--tempo bpm] [--no-arrange] [--no-split-sections] [--notes] [--show-tab] [--json]");
   process.exit(2);
 }
 
@@ -107,7 +109,7 @@ if (args.json) {
   console.log(`  tuning:  ${s.tuningId || "custom"} (${s.tuningNotes.map(midiToNoteName).join(" ")})`);
   console.log(`  notes:   ${s.noteCount} on the guitar track`);
   console.log(`  tracks:  ${s.tracks.join(", ")}`);
-  if (s.sections.length) console.log(`  parts:   ${s.sections.join(", ")}${s.splitSections ? ` (${s.trackNames.length} tracks)` : " (markers only; --split-sections makes a track of each)"}`);
+  if (s.sections.length) console.log(`  parts:   ${s.sections.join(", ")}${s.splitSections ? " (a track each)" : " (markers only)"}`);
   console.log(`  timing:  ${s.rhythmSource} (step ${result.ir.info.step}, ${result.ir.info.unit || "?"} columns per step)`);
 }
 
