@@ -190,6 +190,48 @@ A screenful that comes back word for word the same as the one before it is dropp
 page that did not move, rather than kept as a song that repeats itself: a real repeat is
 engraved again further down and arrives with different bars either side of it.
 
+## The parts of the song (`src/parse/sections.js`, `src/arrange/sections.js`)
+
+Tabs mark where their parts begin, and no two mark it the same way: `[Intro/Verse]`,
+`Chorus:`, `-- Guitar solo --`, `CHORUS`, `Estribillo`, `前奏`. A keyword list cannot be
+the mechanism, so it is only one signal among several. Each candidate line is scored and
+has to reach `CALLOUT_THRESHOLD` (3).
+
+| Signal | Constant | Value | Why |
+|---|---|---|---|
+| Wrapped | `bracketed` | +3 | `[Chorus]`, `(Intro)`, `{Solo}`: someone marked it as a heading on purpose, in any language. |
+| Drawn as a rule | `decorated` | +3 | `-- Chorus --`, `*** Intro ***`. Fenced on both sides, or one run of `MIN_ONE_SIDED_RULE` (3) characters — one stray dash is not a rule. |
+| Names a part | `keyword` | +3 | A word from `SECTION_WORDS`, matched past its accents and its ending, so one entry covers "Refrão" and "refrões". A bonus, never a requirement. |
+| Ends in a colon | `colon` | +2 | `Chorus:` with nothing after it. |
+| Shouted / title case | `shouted`, `titleCased` | +1 | How a heading is written in a cased script. |
+| Numbered | `numbered` | +1 | `Verse 2`, `Parte II`. Parts get counted; lyrics do not. |
+| Brief | `brief` | +1 | 24 characters or fewer: a label, not a sentence. |
+| Music underneath | `aboveMusic` | +1 | The next thing in the text is a stave or a chord line. |
+| Alone | `isolated` | +1 | A blank line above it, or the top of the text. |
+| Said again | `recurring` | +1 | The same label heads music more than once: songs repeat their parts. |
+| Ends in a full stop | `stopped` | -2 | `Everything.` is the end of a sentence, not the name of a part. |
+| Too many words | `wordy` | -2 | More than `MAX_LABEL_WORDS` (6). |
+
+Two rules sit outside the scoring because they are absolute:
+
+- **A sung-looking line needs an explicit mark.** In a chord sheet every lyric is short,
+  capitalised and sitting on top of music, so shape and position carry no information
+  there. A line `isLyricLine` accepts is out unless it is bracketed, ruled, colon-ended,
+  or made of nothing but section words and who plays them (`isHeadingPhrase`: "Guitar
+  solo", "Riff 2").
+- **A heading with no music left below it heads nothing** — that is the page talking
+  ("Comments", "Related tabs").
+
+Sections are then the beats between one callout and the next, named after it; a repeated
+label is numbered ("Chorus", "Chorus 2") so every part has a name of its own. Music
+before the first callout becomes `DEFAULT_SECTION_NAME` ("Start"). Fewer than two parts
+means there is nothing to tell apart, and no sections are reported at all.
+
+`splitBySection()` then cuts every track at those boundaries. A section track keeps its
+**absolute** beats rather than being rebased to zero, so the parts line up on import
+exactly as the tab reads, and the first and last sections reach to -∞ and +∞ so no note
+can fall between two of them and be lost.
+
 ## Arranging (`src/arrange/index.js`)
 
 | What | Constant | Value | Why |
@@ -205,9 +247,16 @@ Empty tracks are never written.
 
 ## MIDI (`src/midi/encode.js`)
 
-Format 1, 480 ticks per quarter note. Track 0 carries only tempo (default 120 unless
-the page or tab states one) and time signature. Then, in this order and only when they
-have notes: "Guitar (as tabbed)" (program 27, channel 0), "Chords" (89, ch 1),
-"Bass" (39, ch 2), "Lead" (81, ch 3). Program numbers are zero-based General MIDI
-values. At the same tick, note-offs are written before note-ons so a repeated pitch
-re-triggers.
+Format 1, 480 ticks per quarter note. Track 0 carries tempo (default 120 unless
+the page or tab states one), time signature, and one marker (`FF 06`) for each of the
+song's callouts — that is where `[Chorus]` ends up visible along a DAW's ruler. Then, in
+this order and only when they have notes: "Guitar (as tabbed)" (program 27, channel 0),
+"Chords" (89, ch 1), "Bass" (39, ch 2), "Lead" (81, ch 3). Program numbers are
+zero-based General MIDI values. At the same tick, note-offs are written before note-ons
+so a repeated pitch re-triggers.
+
+When the tracks are split by section, each role keeps its program and channel and every
+one of its parts is written as its own track, in playing order, named
+"Guitar (as tabbed) - Chorus 2". Markers are written either way: they cost nothing and
+cannot lose a note, whereas cutting the tracks up changes what a DAW shows on import, so
+that stays a setting.

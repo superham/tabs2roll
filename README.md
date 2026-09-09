@@ -47,6 +47,7 @@ install and shows how to pin the toolbar button.
 ```sh
 node tools/convert.js test/fixtures/ode-to-joy.txt out.mid
 node tools/convert.js my-tab.txt --tuning drop-d --step 1/16 --notes
+node tools/convert.js my-tab.txt out.mid --split-sections
 node tools/convert.js screenshot.png out.mid --show-tab
 ```
 
@@ -66,7 +67,9 @@ src/
     stitch.js   screenfuls -> one tab        which staves are whole, how far to scroll
   parse/        text -> IR                  pure, no DOM, no browser APIs
     region.js   whole page -> just the song (see below)
+    sections.js the song's callouts -> parts  (see below)
   arrange/      IR   -> IR + chord/bass/lead pure
+    sections.js IR   -> one track per part
   midi/         IR   -> Uint8Array          pure, hand-written SMF encoder
   pipeline.js   the three above in one call (used by the CLI and the extension)
   background.js event page: runs the pipeline, saves the file, opens onboarding
@@ -322,12 +325,52 @@ extension's own `localStorage`, which needs no permission.
   committed file matches the build.
 - Package with `npx web-ext build --source-dir src`.
 
+### The parts of the song
+
+Almost every tab says where its parts begin, and almost none of them say it the same
+way:
+
+```
+[Intro/Verse]        Chorus:        -- Guitar solo --        CHORUS        Estribillo
+```
+
+`parse/sections.js` finds those callouts and `parse/index.js` hangs them on the beats the
+staves underneath landed on, so the IR carries `sections: [{ name, start, end }]`. Every
+file gets a MIDI marker at each one — that is where `[Chorus]` ends up visible along a
+DAW's ruler — and `--split-sections` (Settings: "Make a track for each part of the song")
+cuts every track at those boundaries, so the chorus is a track you can loop and the
+bridge is one you can drag elsewhere.
+
+The hard part is that there is no agreed spelling, no agreed layout and no agreed
+language, so a keyword list cannot be the mechanism — it is only a bonus. What carries it
+is shape and position: a short line, on its own, with music starting right underneath it.
+Every candidate is scored (`CALLOUT_SCORES`) and has to clear a threshold, which is what
+lets an unbracketed `Estribillo` in and keeps a lyric out. Two rules earn their keep:
+
+- **A line that reads like something someone sings needs an explicit mark.** In a chord
+  sheet *every* lyric is short, capitalised and sitting on top of music, so shape and
+  position say nothing there. Brackets, a drawn rule, a colon, or a label made of nothing
+  but section words ("Guitar solo") gets a sung-looking line in; nothing else does.
+- **A full stop is punctuation and one dash is not a rule.** Reading `Is on your outside.`
+  as a decorated heading turned every line of a chord sheet into a part of its own.
+
+A tab that marks nothing comes out exactly as it did before: no markers, one track.
+
 ## Decisions worth knowing about
 
 - **No framework, no bundler** for the popup and pages: plain HTML and JS modules, so
   the review surface is the source itself.
 - **Chords, bass and lead** are always generated (unless turned off in Settings). Two-note
   power chords count as chords for the pad; see the musical-decisions doc.
+- **Markers always, split tracks on request.** A marker costs nothing and cannot be wrong
+  in a way that loses notes, so the song's callouts are always written into the file.
+  Cutting the tracks up changes what a DAW shows on import, so that is a setting.
+- **A split part keeps its absolute beats.** A section track is not a loop rebased to
+  zero; it sits where it plays, so the parts line up on import exactly as the tab reads.
+- **The song-region trimmer asks the callout finder too**, but only about lines with a
+  stave under them. A heading above a stave is unmistakable; a lone capitalised word
+  above a column of chord names is `Chords` or `Strumming` — the page furniture the
+  trimmer exists to remove — at least as often as it is a part of a song.
 - **Capo** raises every string so the file sounds at the real pitch of the recording.
 - **Muted `x` strokes** become short, quiet notes at the open-string pitch, so strumming
   patterns keep their rhythm.

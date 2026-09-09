@@ -145,6 +145,11 @@ export const STRINGS = {
     tracksLead: "Lead: the single-note melodies and solos.",
     tracksEmpty: "A track is left out when the tab has nothing for it.",
 
+    partsHeading: "The parts of the song",
+    parts1: "Tabs mark their parts as they go — \"[Intro]\", \"Chorus:\", \"-- Guitar solo --\", or whatever the person who wrote it out reached for, in whatever language. tab2roll finds those callouts and puts a marker at each one, so your DAW shows the song laid out along the ruler instead of one long take.",
+    parts2: "Turn on \"Make a track for each part of the song\" in Settings and it goes further: every part becomes a track of its own, sitting where it plays, so you can loop the chorus or drag the bridge somewhere else without cutting anything up first.",
+    parts3: "A tab that never says where its parts are comes out as one track, exactly as it did before.",
+
     timingHeading: "The timing sounds off",
     timing1: "Plain-text tab has no timing in it, so tab2roll makes a best guess: evenly spaced notes become evenly spaced eighth notes, and bar lines line up with bars.",
     timing2: "If everything sounds twice as fast or twice as slow, open Settings and change the timing step, then send the tab again.",
@@ -189,6 +194,9 @@ export const STRINGS = {
     tracksHeading: "Extra tracks",
     arrangeLabel: "Also make chords, bass and lead tracks",
     arrangeHint: "Turn this off to get only the guitar track, exactly as tabbed.",
+    partsHeading: "Parts of the song",
+    splitLabel: "Make a track for each part of the song",
+    splitHint: "Most tabs mark their parts — \"[Intro]\", \"Chorus\", \"Estribillo\". Turn this on and each one becomes its own track, ready to loop and rearrange. Either way the parts are marked along the top of your DAW, and a tab that marks nothing comes out as one track as before.",
     saved: "Saved.",
     resetButton: "Back to defaults",
   },

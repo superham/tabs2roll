@@ -478,9 +478,13 @@ function collectGaps(stave, gapCounts) {
  *   capo          capo fret, default 0
  *   timeSignature [num, den], default [4, 4]
  *
- * Returns { notes, tuning, tuningId, staveCount, stringCount, unit }.
+ * Returns { notes, tuning, tuningId, staveCount, stringCount, unit,
+ * placements }.
  * Notes: { midi, start, length, velocity, technique, string, fret }, sorted
  * by start. `string` is 1 for the highest string.
+ * `placements` says which lines of the text each stave came from and when it
+ * plays — { firstLine, lastLine, start, length } — which is what parse/index
+ * needs to hang the song's callouts on the right beats.
  */
 export function parseTab(text, options = {}) {
   const lines = splitLines(text);
@@ -492,7 +496,7 @@ export function parseTab(text, options = {}) {
 
   const staves = findStaves(lines);
   if (!staves.length) {
-    return { notes: [], tuning: null, tuningId: null, staveCount: 0, stringCount: 0, unit: null, timeSignature };
+    return { notes: [], tuning: null, tuningId: null, staveCount: 0, stringCount: 0, unit: null, timeSignature, placements: [] };
   }
 
   const gapCounts = new Map();
@@ -500,6 +504,7 @@ export function parseTab(text, options = {}) {
   const unit = estimateUnit(gapCounts);
 
   const rawNotes = [];
+  const placements = [];
   let cursor = 0;
   let firstTuning = null;
   let firstTuningId = null;
@@ -536,11 +541,12 @@ export function parseTab(text, options = {}) {
         fret: n.fret,
       });
     }
+    placements.push({ firstLine: stave.firstLine, lastLine: stave.lastLine, start: cursor, length: layout.length });
     cursor += layout.length;
   }
 
   const notes = assignLengths(rawNotes, { grid: stepBeats / 2, maxSustain: MAX_SUSTAIN_BARS * beatsPerBar });
-  return { notes, tuning: firstTuning, tuningId: firstTuningId, staveCount: staves.length, stringCount, unit, timeSignature, totalBeats: cursor };
+  return { notes, tuning: firstTuning, tuningId: firstTuningId, staveCount: staves.length, stringCount, unit, timeSignature, totalBeats: cursor, placements };
 }
 
 /**

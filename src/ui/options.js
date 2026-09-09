@@ -7,10 +7,11 @@ const $ = (id) => document.getElementById(id);
 function render(options) {
   $("step").value = options.step;
   $("arrange").checked = options.arrange !== false;
+  $("split-sections").checked = options.splitSections === true;
 }
 
 function save() {
-  const options = { step: $("step").value, arrange: $("arrange").checked };
+  const options = { step: $("step").value, arrange: $("arrange").checked, splitSections: $("split-sections").checked };
   setOptions(options);
   $("status").textContent = STRINGS.options.saved;
   setTimeout(() => {
@@ -22,6 +23,7 @@ fillStrings();
 render(getOptions());
 $("step").addEventListener("change", save);
 $("arrange").addEventListener("change", save);
+$("split-sections").addEventListener("change", save);
 $("reset").addEventListener("click", () => {
   render(DEFAULT_OPTIONS);
   save();

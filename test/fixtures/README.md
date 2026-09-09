@@ -11,6 +11,14 @@ Grace) plus deliberately awkward shapes (no labels, low string on top, staves st
 together, separators, Ultimate Guitar markup, techniques, seven strings, bass, capo,
 alternate tunings, a chord sheet with an intro riff, and a page of prose).
 
+The two `sections-*.txt` files pin `src/parse/sections.js`, which finds the callouts
+that say where a song's parts begin. They are deliberately the cases a keyword list
+cannot reach: `sections-unmarked.txt` heads its parts in Spanish with no brackets and no
+colons, so only shape and position can find them, and `sections-decorated.txt` uses a
+different dressing every time (`--- Intro ---`, `CHORUS:`, `** Guitar solo **`,
+`[Outro] x4`). The `sections` field of every golden file records what was found, so a
+change to the scoring shows up across all the fixtures at once.
+
 The two `page-*.txt` files are different: they are whole web pages as a person would
 get them by selecting everything and copying, navigation and footer included. They
 exist to pin the behaviour of `src/parse/region.js`, which cuts a page down to the

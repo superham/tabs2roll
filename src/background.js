@@ -56,7 +56,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
 });
 
 /**
- * message: { type, text, meta: { source, title, artist, tempo, capo }, options: { tuningId, step, arrange, filenameSuffix } }
+ * message: { type, text, meta: { source, title, artist, tempo, capo }, options: { tuningId, step, arrange, splitSections, filenameSuffix } }
  * reply:   { ok: true, filename, ...summary } or { ok: false, code }
  * Codes: "no-tab", "no-notes", "download-failed", "unknown". The popup maps
  * every code to plain language; nothing raw ever reaches the user.
@@ -83,6 +83,7 @@ async function handleConvert(message) {
       tuningId: options.tuningId || undefined,
       step: options.step || undefined,
       arrange: options.arrange !== false,
+      splitSections: options.splitSections === true,
       filenameSuffix: options.filenameSuffix || "",
     });
   } catch (err) {

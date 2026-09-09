@@ -12,8 +12,15 @@
 //     timeSignature: [num, den],
 //     tuning: number[],          // open-string MIDI numbers, low to high
 //     rhythmSource: "exact" | "guessed",
+//     sections: [{ name, label, line, start, end, repeat }],
 //     tracks: [{ role, notes: [{ midi, start, length, velocity, technique }] }]
 //   }
+//
+// `sections` are the song's callouts — "[Intro]", "Chorus:", "Estribillo" —
+// with the beats each one covers. It is empty when the text has fewer than
+// two parts to tell apart, which is most short tabs. `repeat` is the count a
+// callout stated ("[Verse] x4"); it is recorded but not acted on, because
+// nothing here plays a part twice.
 //
 // `start` and `length` are in BEATS (quarter notes) as floats, not ticks.
 // `velocity` is 0..1. Consumers convert at their own boundary.
@@ -22,6 +29,7 @@
 
 import { splitLines } from "./text.js";
 import { trimToSong } from "./region.js";
+import { buildSections } from "./sections.js";
 import { detect } from "./detect.js";
 import { findMeta } from "./meta.js";
 import { parseTab, STEP_BEATS, DEFAULT_STEP } from "./tab.js";
@@ -33,6 +41,7 @@ export { trimToSong, findSongRegion } from "./region.js";
 export { looksLikeTab, tabLineCount, isTabShapedLine } from "./tabshape.js";
 export { cleanText } from "./text.js";
 export { findMeta } from "./meta.js";
+export { buildSections, findCallouts } from "./sections.js";
 export { STEP_BEATS, DEFAULT_STEP } from "./tab.js";
 export * as tuning from "./tuning.js";
 
@@ -81,6 +90,9 @@ export function parseText(text, options = {}) {
   // ...while the notes come from the song alone, with the page's navigation,
   // chord legend, comments and artist index cut away.
   const song = options.wholePage ? cleanTextOf(text) : trimToSong(text);
+  // Sections are found in the same lines the notes come from, so a callout's
+  // line number and a stave's line number mean the same thing.
+  const songLines = splitLines(song);
   const detected = detect(song);
   const kind = options.kind || detected.kind;
   if (kind === "none") throw new ParseError("no-tab", "No tab or chords found in text");
@@ -108,6 +120,7 @@ export function parseText(text, options = {}) {
     timeSignature,
     tuning: STANDARD_GUITAR.slice(),
     rhythmSource: "guessed",
+    sections: [],
     tracks: [],
     info: { staves: 0, chords: 0, capo, tuningId: null, tuningFrom: null, step: STEP_BEATS[options.step] ? options.step : DEFAULT_STEP },
   };
@@ -118,6 +131,7 @@ export function parseText(text, options = {}) {
     ir.tracks.push({ role: "guitar", notes: parsed.notes });
     ir.info.chords = parsed.chordCount;
     ir.info.totalBeats = parsed.totalBeats;
+    ir.sections = buildSections(songLines, parsed.placements);
     return ir;
   }
 
@@ -137,5 +151,6 @@ export function parseText(text, options = {}) {
   ir.info.tuningId = parsed.tuningId;
   ir.info.unit = parsed.unit;
   ir.info.totalBeats = parsed.totalBeats;
+  ir.sections = buildSections(songLines, parsed.placements);
   return ir;
 }

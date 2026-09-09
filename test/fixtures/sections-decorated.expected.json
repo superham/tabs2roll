@@ -1,0 +1,41 @@
+{
+  "kind": "tab",
+  "title": "Guitar solo",
+  "artist": "",
+  "tempo": 120,
+  "timeSignature": [
+    4,
+    4
+  ],
+  "tuning": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+  ],
+  "tuningId": "standard",
+  "staves": 4,
+  "chords": 0,
+  "unit": 4,
+  "totalBeats": 16,
+  "noteCount": 15,
+  "firstMidi": 40,
+  "lastMidi": 50,
+  "firstStart": 0,
+  "lastStart": 13,
+  "techniques": {
+    "hammer": 1
+  },
+  "sections": [
+    "Intro 0-4",
+    "CHORUS 4-8",
+    "Guitar solo 8-12",
+    "Outro 12-16"
+  ],
+  "tracks": {
+    "guitar": 15,
+    "lead": 15
+  }
+}
