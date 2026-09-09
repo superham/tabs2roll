@@ -67,6 +67,22 @@ test("a heading phrase is section words, who plays them, and a number", () => {
   assert.ok(!isHeadingPhrase("Bananas"));
 });
 
+test("a bracketed line of words is the line being played, not the part", () => {
+  // Ultimate Guitar tabbers bracket the words they are about to play as well
+  // as the part they are playing, and brackets alone cannot tell them apart.
+  assert.equal(calloutCandidate("[you know i always try to settle her down]"), null);
+  assert.equal(calloutCandidate("[\"it gets difficult to talk when you laugh\"]"), null);
+  assert.ok(calloutCandidate("[Verse]"));
+  assert.ok(calloutCandidate("[Guitar Solo]"));
+});
+
+test("a note after a heading joins the name, or is dropped for being one", () => {
+  // "[Verse 2] (Rythm)" and "[Verse 2] (Lead)" are two different parts, so
+  // the qualifier has to survive; a sentence after the heading does not.
+  assert.equal(stripDecoration("[Verse 2] (Rythm):").label, "Verse 2 (Rythm)");
+  assert.equal(stripDecoration("[Verse] THIS GRADUALLY SLOWS DOWN TOWARDS THE END").label, "Verse");
+});
+
 test("music, headers and playing instructions are never headings", () => {
   assert.equal(calloutCandidate("e|--0--2--3--0--2--|"), null);
   assert.equal(calloutCandidate("Am  G  F  C"), null);
@@ -114,6 +130,12 @@ test("a heading with no music left below it heads nothing", () => {
     findCallouts(lines, new Set([2])).map((c) => c.label),
     ["Intro"],
   );
+});
+
+test("a quoted lyric between a heading and its stave does not steal the part", () => {
+  const lines = linesOf(["[Verse]", "", "[and the words go something like this]", "", "MUSIC", "", "[Chorus]", "", "MUSIC"].join("\n"));
+  const sections = buildSections(lines, [place(4, 0, 4), place(8, 4, 4)]);
+  assert.deepEqual(sections.map((s) => s.name), ["Verse", "Chorus"]);
 });
 
 test("a comment between a heading and its music does not break them apart", () => {

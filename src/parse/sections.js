@@ -48,7 +48,6 @@ export const CALLOUT_SCORES = {
   aboveMusic: 1, // the next thing in the text is a stave or a chord line
   isolated: 1, // a blank line above it, or the top of the text
   recurring: 1, // the same label heads music more than once in the song
-  wordy: -2, // more words than a heading has
 };
 
 /** Total a line needs before it counts as a callout. */
@@ -57,8 +56,14 @@ export const CALLOUT_THRESHOLD = 3;
 /** A label longer than this is a sentence, not the name of a part. */
 export const MAX_LABEL_LENGTH = 48;
 
-/** ...and so is one with more words than this. */
-export const MAX_LABEL_WORDS = 6;
+/**
+ * ...and so is one with more words than this. A hard limit, not a penalty:
+ * Ultimate Guitar tabbers bracket the line they are about to play as well as
+ * the part they are playing — "[You know i always try to settle ya']" sits
+ * between "[Verse]" and its stave — and brackets alone cannot tell the two
+ * apart. Length can: a heading is a label, and a label is short.
+ */
+export const MAX_LABEL_WORDS = 5;
 
 /** "brief" — short enough that the label reads as a heading at a glance. */
 export const BRIEF_LABEL_LENGTH = 24;
@@ -180,6 +185,18 @@ export function stripDecoration(line) {
       bracketed = true;
       continue;
     }
+    // A bracket that closes early is a heading with a note after it:
+    // "[Verse 2] (Rythm)", "[Verse] THIS GRADUALLY SLOWS DOWN". Keep the note
+    // when it still reads as part of the name, drop it when it is a sentence.
+    const at = close ? s.indexOf(close) : -1;
+    if (at > 1) {
+      const inside = s.slice(1, at).trim();
+      const after = s.slice(at + 1).trim();
+      const together = after ? inside + " " + after : inside;
+      s = together.length <= MAX_LABEL_LENGTH && wordCount(together) <= MAX_LABEL_WORDS ? together : inside;
+      bracketed = true;
+      continue;
+    }
     const head = DECOR_HEAD.exec(s);
     const tail = DECOR_TAIL.exec(s);
     if (!head && !tail) break;
@@ -252,6 +269,10 @@ export function isHeadingPhrase(label) {
   return sectionWords > 0;
 }
 
+function wordCount(text) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function letterCount(text) {
   return (text.match(/\p{L}/gu) || []).length;
 }
@@ -274,6 +295,7 @@ export function calloutCandidate(line) {
   const parsed = stripDecoration(text);
   const { label } = parsed;
   if (!label || label.length > MAX_LABEL_LENGTH) return null;
+  if (wordCount(label) > MAX_LABEL_WORDS) return null;
   if (letterCount(label) < 2) return null;
   if (NOT_A_CALLOUT_RE.test(label)) return null;
   return parsed;
@@ -311,7 +333,6 @@ export function scoreCallout(parsed, line, context = {}) {
   if (context.aboveMusic) score += S.aboveMusic;
   if (context.isolated) score += S.isolated;
   if (context.recurring) score += S.recurring;
-  if (label.split(/\s+/).length > MAX_LABEL_WORDS) score += S.wordy;
   return score;
 }
 

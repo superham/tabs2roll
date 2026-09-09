@@ -16,8 +16,13 @@ that say where a song's parts begin. They are deliberately the cases a keyword l
 cannot reach: `sections-unmarked.txt` heads its parts in Spanish with no brackets and no
 colons, so only shape and position can find them, and `sections-decorated.txt` uses a
 different dressing every time (`--- Intro ---`, `CHORUS:`, `** Guitar solo **`,
-`[Outro] x4`). The `sections` field of every golden file records what was found, so a
-change to the scoring shows up across all the fixtures at once.
+`[Outro] x4`). `sections-ug-layout.txt` is the Ultimate Guitar habit that brackets are
+used for two different things: the part being played *and* the line of words about to be
+sung, one right under the other, plus the qualifiers and asides tabbers hang off a
+heading (`[Verse 2] (Rythm):`, `[Outro] THIS GRADUALLY SLOWS DOWN`). Its words are
+made up, like the rest of the fixtures here. The `sections` field of every golden file
+records what was found, so a change to the scoring shows up across all the fixtures at
+once.
 
 The two `page-*.txt` files are different: they are whole web pages as a person would
 get them by selecting everything and copying, navigation and footer included. They
