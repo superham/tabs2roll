@@ -41,6 +41,13 @@ export const STRINGS = {
     picturePartial: (percent) => `That's about ${percent}% of the song: the part that was on screen. Scroll the page down and open tab2roll again to read the next bit.`,
     pictureAdd: "Join this onto what I read before",
     pictureAdded: "Joined onto what you read before.",
+    // Reading the rest of it. The page has to be scrolled to do this, which
+    // is the only thing tab2roll ever changes about a page, so the button
+    // says what it is going to do before it does it.
+    wholeSong: "Read the whole song",
+    wholeSongWorking: (n) => `Scrolling the page and reading it… screenful ${n}.`,
+    wholeSongRead: (screenfuls) => `That's the whole song, ${screenfuls} screenfuls of it, joined up and the page put back.`,
+    wholeSongNothing: "I scrolled through the page but couldn't read any more of it than what's below already.",
     pictureNoStaves: "This page draws its tab as a picture, and I couldn't make out the strings in it. Try making the page bigger (Ctrl and +) and clicking again.",
     pictureNotation: "This page is showing you notes on a stave rather than fret numbers on a tab. I can only read tab so far — look for the tab view, or one of the text tabs for this song.",
     pictureNothing: "I found the sheet music but couldn't read any fret numbers off it. Try making the page bigger (Ctrl and +) and clicking again.",
@@ -151,7 +158,7 @@ export const STRINGS = {
     sheet1: "Some tab pages don't have any tab text on them at all. The \"Official\" and \"Pro\" tabs on Ultimate Guitar, and interactive players like Songsterr, paint the music onto the page as a picture, the way a printed songbook does. There is nothing to copy: the notes are pixels.",
     sheet2: "Tab2roll reads those pictures. Click the toolbar button on one of those pages and it works out where the strings are, reads the fret numbers off them, and shows you the tab it made in the box under the button before anything is saved.",
     sheet3: "Check it before you send it. Reading a picture is guesswork and a number now and then comes out wrong; it is far quicker to fix a 7 that should be a 1 in that box than to hunt for it in your DAW afterwards. Tab2roll says how many marks it could not make out, and if it is unsure it says so.",
-    sheet4: "A player only draws the bars that are on screen, so one click reads one screenful. Scroll the page down, open tab2roll again, and click \"Join this onto what I read before\" to add the next stretch to what you already have.",
+    sheet4: "A player only draws the bars that are on screen, so one click reads one screenful. \"Read the whole song\" walks the rest of it for you: it scrolls the page down a staff at a time, reads each screenful, joins them up, and puts the page back where it was. It is the only thing tab2roll ever changes about a page, and it only happens when you press that button. To do it by hand instead, scroll the page yourself, open tab2roll again, and click \"Join this onto what I read before\".",
     sheet5: "You can also drop a picture straight into the window, or paste one in: a screenshot of any tab player, a photo of a page from a songbook, a page of a PDF. The bigger and sharper the numbers are, the better it reads them — if a page comes out badly, zoom in (Ctrl and +) and try again.",
     sheet6: "It reads tablature — fret numbers on strings. Notes written on an ordinary five-line stave are a different problem and tab2roll leaves them alone rather than guessing; it will tell you that is what it found.",
 

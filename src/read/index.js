@@ -26,14 +26,15 @@
 import { toInk, inkFraction } from "./image.js";
 import { findStaves } from "./staff.js";
 import { eraseStaffLines } from "./glyphs.js";
-import { readSystem } from "./score.js";
+import { readSystem, confidenceOf } from "./score.js";
 import { toAsciiTab } from "./ascii.js";
 
 export { toInk, toGray, inkFraction } from "./image.js";
 export { findStaffLines, groupSystems, findStaves } from "./staff.js";
 export { classifyGlyph } from "./digits.js";
-export { readSystem, columnsOf } from "./score.js";
+export { readSystem, columnsOf, confidenceOf } from "./score.js";
 export { toAsciiTab, systemToAscii } from "./ascii.js";
+export { wholeSystems, wholeReading, readTo, stitchReads, EDGE_MARGIN } from "./stitch.js";
 
 /** A picture with less ink than this is blank: an empty canvas, a loading page. */
 export const MIN_INK = 0.0005;
@@ -57,8 +58,9 @@ export const REASONS = {
  *   inverted  force light-on-dark; by default the picture is asked
  *   minConfidence  how sure the reader must be of a mark to use it
  *
- * Returns { ok, text, reason, staves, notes, bars, unreadable, confidence,
- * systems }. `ok` false always comes with a `reason`, never an empty success.
+ * Returns { ok, text, reason, width, height, staves, notes, bars, unreadable,
+ * confidence, systems }. `ok` false always comes with a `reason`, never an
+ * empty success.
  */
 export function readSheetMusic(image, options = {}) {
   const bitmap = toInk(image, options);
@@ -81,6 +83,11 @@ export function readSheetMusic(image, options = {}) {
   return {
     ok: true,
     text,
+    // The size of the picture this came out of. The staves carry their
+    // positions in it, and src/read/stitch.js needs both to tell a staff that
+    // ended from one that ran off the bottom of the screen.
+    width: bitmap.width,
+    height: bitmap.height,
     reason: null,
     staves: tabs.length,
     notation: systems.length - tabs.length,
@@ -94,29 +101,6 @@ export function readSheetMusic(image, options = {}) {
   };
 }
 
-/**
- * How much the reader believes itself, 0 to 1.
- *
- * Two things pull it down: marks it could not make out at all, and marks it
- * matched only loosely. Shown to the user rather than kept quiet, because the
- * honest answer to "is this right?" on a blurry screenshot is "probably not,
- * have a look".
- */
-export function confidenceOf(systems, unreadable, notes) {
-  let total = 0;
-  let count = 0;
-  for (const system of systems) {
-    for (const event of system.events) {
-      total += Math.min(1, event.score);
-      count++;
-    }
-  }
-  if (!count) return 0;
-  const mean = total / count;
-  const missed = unreadable / (notes + unreadable);
-  return Math.max(0, Math.min(1, mean * (1 - missed)));
-}
-
 function empty(reason, extra) {
-  return { ok: false, text: "", reason, staves: 0, notation: 0, strings: 0, notes: 0, bars: 0, unreadable: 0, confidence: 0, systems: [], ...extra };
+  return { ok: false, text: "", reason, width: 0, height: 0, staves: 0, notation: 0, strings: 0, notes: 0, bars: 0, unreadable: 0, confidence: 0, systems: [], ...extra };
 }

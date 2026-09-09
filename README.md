@@ -13,6 +13,9 @@ standard MIDI file you can open in your DAW.
   at all — so tab2roll reads the picture: it finds the strings, reads the fret numbers off
   them and shows you the tab it made before saving anything. Drop or paste a screenshot or
   a photo of a page and it does the same.
+- **Reads the whole song, not just what fits.** A player only draws the bars on screen, so
+  one click reads one screenful. "Read the whole song" scrolls the page a staff at a time,
+  reads each screenful, joins them up and puts the page back where it was.
 - Reads the song out of the page and leaves the rest behind: navigation, the
   chord-diagram legend, comments and the A-Z artist index never become bars of music.
 - Makes up to four tracks: the guitar exactly as tabbed, plus chords, bass and lead
@@ -60,6 +63,7 @@ src/
   extract/      DOM  -> raw tab text        runs inside the page; site-specific
                 DOM  -> pixels              score-canvas.js, for pages that draw it
   read/         picture -> ASCII tab text   pure, no DOM (see below)
+    stitch.js   screenfuls -> one tab        which staves are whole, how far to scroll
   parse/        text -> IR                  pure, no DOM, no browser APIs
     region.js   whole page -> just the song (see below)
   arrange/      IR   -> IR + chord/bass/lead pure
@@ -95,6 +99,14 @@ ES modules while the injected script stays a single self-contained, import-free
 function. It reads the DOM and returns plain data; it injects no UI, keeps no state and
 never touches the network. The generated file is committed so a checkout loads without
 a build; `npm test` fails if it is stale.
+
+There is one exception to "reads and returns", and it is deliberately not in that file.
+"Read the whole song" scrolls the page, which means changing it. That code lives in
+`popup.js` as `SCROLL_SCORE`, injected as a function on its own, only when the user presses
+that button, and it does nothing but scroll and wait for a repaint. The popup puts the page
+back where it found it when the reading is done, including when it fails — the one case it
+cannot cover is the popup being closed part-way through, since that is the code doing the
+putting back.
 
 ### Reading sheet music
 
@@ -142,9 +154,72 @@ of those is kept out by a rule about where and how big a fret number is, written
 before, written in brackets, comes through as the ghost note written tab already means by
 `(7)`. `test/fixtures/pictures/player-page.png` has the lot of it in one picture.
 
+#### One screenful, or the whole song
+
 A canvas holds the bars that are on screen and no more, so one click reads one screenful of
-a four-minute song. The popup says how much of the score that was and offers to join the
-next screenful onto it.
+a four-minute song. The popup says how much of the score that was, and offers two ways to
+get the rest.
+
+**Read the whole song** walks the page: look, scroll, look again, all the way down. Two
+pieces of arithmetic make it work, both in `src/read/stitch.js` and both testable without a
+browser:
+
+- **Which staves are whole.** A staff running off the bottom of the screen is the dangerous
+  one: six lines cut down to four still group as a staff — a bass, to look at it — and would
+  come back as music nobody played, on strings the guitar does not have. So a staff is kept
+  only when a whole line spacing of clear picture was found below its last line. That
+  number is not a guess: staff lines are evenly spaced, so a clear spacing with no line in
+  it means the staff really did end there, and less than one means the next line could be
+  sitting just off the screen. The top edge is deliberately *not* trimmed — see below.
+- **How far to scroll.** Just past the bottom of the last whole staff, converted from
+  picture pixels into the page's own with the scale each reading carries (`cssPerPixel`: a
+  canvas knows it from where it sits on screen against how big its buffer is). That lands
+  the next staff hard against the top of the next picture, which is exactly why the top
+  edge is left alone: trimming there would throw away the bars the scroll was made to
+  reach, every time, all the way down.
+
+Nothing is read twice and nothing on the fold is lost, so the screenfuls join by
+concatenation with no overlap to reconcile. A screenful identical to the one before it is
+dropped as a page that did not move, and the walk stops when the scroller reports it is at
+the end, when it will not move, or after forty screenfuls, whichever comes first.
+
+**Or by hand**, which is still there and still works: scroll the page yourself, open
+tab2roll again, and click "Join this onto what I read before".
+
+#### Getting at the pixels
+
+A canvas does not always hand its pixels over, and a tab player is exactly the kind of page
+that will not. A canvas drawn through WebGL has no 2d context to read. One whose control
+has been passed to a worker (`transferControlToOffscreen`) has no pixels in the page at
+all. One holding another site's images may not be read. All three throw or answer null, and
+all three used to look identical to "this page has no music on it".
+
+So there are two routes to the same pixels, tried in that order:
+
+1. **The canvas itself**, via `getImageData`. Exactly what was drawn, at whatever
+   resolution the page drew it. Nothing is better when it works.
+2. **A photograph of the window**, via `tabs.captureVisibleTab`, cropped to where the
+   canvas is on the screen. This holds whatever the person is looking at, however the page
+   drew it — WebGL, a worker, or an `<img>` the page swapped in — because it is a picture
+   of the screen rather than a copy of a buffer.
+
+`score-canvas.js` decides which: every canvas it passes over is recorded with a reason
+(`no-2d-context`, `transferred`, `blocked`, `blank`, `tiny`…), and the ones whose pixels
+are out of reach but which are still on the screen come back as `shots` — a rectangle in
+CSS pixels, plus the size of the window they were measured in. The popup takes one
+photograph, cuts each rectangle out of it and reads it with the same `src/read/` pipeline.
+
+The photograph arrives at the screen's own resolution, which is twice the page's own
+measurements on an ordinary laptop, so the scale is worked out from the picture that
+arrived (`cropBox` in `src/ui/picture.js`) rather than from `devicePixelRatio`. It is a
+PNG, not a JPEG: a JPEG's smudges around a small `7` are exactly what turns it into a `1`.
+No permission is added for any of this — `activeTab`, granted by the click that opens the
+popup, is what `captureVisibleTab` needs, and the photograph is cropped, read and dropped
+without being stored or sent anywhere.
+
+The reasons are not only for the code. They go to the console on every click as
+`seen.canvasSkipped`, because "there is a score here I am not allowed to read" and "there
+is no score here" want opposite answers from whoever is looking into it.
 
 ### When a real page does not work
 
@@ -176,6 +251,22 @@ carrying an error rather than as a failure.
 value back. Firefox does this for file injections, so the answer is fetched
 with a second, function-based injection instead; the next console line
 reports whether that worked.
+
+On a page that draws its tab, `canvases` is how many canvases gave up their
+pixels and `canvasSkipped` says what happened to the rest:
+
+```
+[tab2roll] page: { ok: false, reason: "unsupported", type: "official",
+                   canvases: 0, canvasSkipped: "1486x1870 blank, 1486x1870 no-2d-context" }
+[tab2roll] read a photograph of the window: { ok: true, staves: 6, notes: 42 }
+```
+
+`canvases: 0` with nothing in `canvasSkipped` means the page really has no
+canvas on it — a different page, or one that has not finished loading.
+`canvases: 0` with `no-2d-context`, `transferred` or `blocked` means the
+music is there but the buffer is shut, and the next line says how the
+photograph of it went. `blank` on its own is usually a player that has not
+painted yet: give the page a moment and click again.
 
 To check a page without the extension at all, paste the contents of
 [tools/page-check.js](tools/page-check.js) into the console of the tab page

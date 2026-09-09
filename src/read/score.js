@@ -165,6 +165,34 @@ export function readSystem(bitmap, system, options = {}) {
 }
 
 /**
+ * How much the reader believes itself, 0 to 1.
+ *
+ * Two things pull it down: marks it could not make out at all, and marks it
+ * matched only loosely. Shown to the user rather than kept quiet, because the
+ * honest answer to "is this right?" on a blurry screenshot is "probably not,
+ * have a look".
+ *
+ * It lives here, with the events it measures, so that anything holding a set
+ * of staves can work it out for itself — and so that a caller keeping only
+ * some of them (src/read/stitch.js, reading a song a screenful at a time) can
+ * say how sure it is of what it kept rather than of what it threw away.
+ */
+export function confidenceOf(systems, unreadable, notes) {
+  let total = 0;
+  let count = 0;
+  for (const system of systems) {
+    for (const event of system.events) {
+      total += Math.min(1, event.score);
+      count++;
+    }
+  }
+  if (!count) return 0;
+  const mean = total / count;
+  const missed = unreadable / (notes + unreadable);
+  return Math.max(0, Math.min(1, mean * (1 - missed)));
+}
+
+/**
  * Tablature or notation?
  *
  * Line count answers it almost always: four, six and seven lines are a bass,

@@ -14,6 +14,12 @@
 // page's <canvas> elements, for pages that draw the tab instead of writing
 // it. Only failures carry them — there is no reason to copy a megabyte of
 // pixels off a page that has already given us the text.
+//
+// It may also carry `shots` and `view`: the canvases whose pixels the page
+// would not hand over (WebGL, a worker, another site's images) as rectangles
+// on the screen, so the popup can photograph them with tabs.captureVisibleTab
+// and read that instead. `seen.canvasSkipped` says why each one was passed
+// over, so a page that gives nothing says which kind of nothing it gave.
 
 /**
  * A short account of what the page looked like to the extractor. Printed to
@@ -54,14 +60,26 @@ export function extractFromPage(doc, shape, sites) {
   /** No text on this page. Before giving up, look for a picture of the music. */
   const givingUp = (result) => {
     const seen = describePage(doc, shape);
-    let score = [];
+    let looked = null;
     try {
-      score = canvases ? canvases(doc) : [];
+      looked = canvases ? canvases(doc) : null;
     } catch (err) {
       seen.canvasError = String((err && err.message) || err);
     }
+    const score = (looked && looked.images) || [];
+    const skipped = (looked && looked.skipped) || [];
+    const shots = (looked && looked.shots) || [];
     seen.canvases = score.length;
-    return score.length ? { ...result, score, seen } : { ...result, seen };
+    // One string, not an array: the console collapses an array logged inside
+    // an object to "(3) [...]", which is exactly the detail this is for.
+    if (skipped.length) seen.canvasSkipped = skipped.map((s) => `${s.width}x${s.height} ${s.reason}`).join(", ");
+    const extra = {};
+    if (score.length) extra.score = score;
+    if (shots.length) {
+      extra.shots = shots;
+      extra.view = looked.view || null;
+    }
+    return { ...result, ...extra, seen };
   };
 
   try {

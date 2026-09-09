@@ -13,7 +13,8 @@ import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STRINGS } from "../src/strings.js";
-import { renderTab } from "./helpers/draw.js";
+import { renderTab, createImage } from "./helpers/draw.js";
+import { writePng } from "../tools/png.js";
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const TAB = "e|--0--2--3--|\nB|-----------|\nG|--2--2--2--|\nD|-----------|\nA|-----------|\nE|-----------|";
@@ -64,18 +65,35 @@ const STUB = (scenario) => `
       openOptionsPage: async () => { calls.push(["openOptionsPage"]); },
     },
     tabs: {
-      query: async () => [{ id: 7, url: scenario.url }],
+      query: async () => [{ id: 7, url: scenario.url, windowId: 3 }],
       create: async (o) => { calls.push(["tabs.create", o.url]); },
+      captureVisibleTab: async (windowId, options) => {
+        calls.push(["captureVisibleTab", { windowId: windowId === undefined ? null : windowId, format: options && options.format }]);
+        if (scenario.photoFails) throw new Error("Missing activeTab permission");
+        return scenario.photo || null;
+      },
     },
     scripting: {
       executeScript: async (o) => {
         calls.push(["executeScript", { files: o.files || null, func: !!o.func }]);
         if (o.files) {
           if (scenario.extractThrows) throw new Error("Missing host permission for the tab");
+          // A page being read a screenful at a time looks different on every
+          // pass; scenario.extracts is that sequence, and the last one stands.
+          const queue = scenario.extracts;
+          const extract = queue && queue.length ? queue[Math.min(calls.filter((c) => c[0] === "executeScript" && c[1].files).length - 1, queue.length - 1)] : scenario.extract;
           // The real script parks its answer on a global as well as returning it.
-          globalThis["__tab2rollResult"] = scenario.extract;
+          globalThis["__tab2rollResult"] = extract;
           // Firefox does not always hand back a file-injected script's value.
-          return scenario.noCompletionValue ? [{}] : [{ result: scenario.extract }];
+          return scenario.noCompletionValue ? [{}] : [{ result: extract }];
+        }
+        // The injection that scrolls the page is the one that scrolls. There
+        // is no page to scroll here, so the scenario says what it did.
+        if (String(o.func).includes("scrollTo")) {
+          calls.push(["scroll", o.args]);
+          const steps = scenario.scrolls || [];
+          const done = calls.filter((c) => c[0] === "scroll").length - 1;
+          return [{ result: steps[Math.min(done, steps.length - 1)] || null }];
         }
         return [{ result: o.func.apply(null, o.args || []) }];
       },
@@ -309,6 +327,143 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.equal(sent.meta.source, "ultimate-guitar");
     assert.equal(sent.meta.title, "The Trooper");
     assert.equal(sent.meta.artist, "Iron Maiden");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a player whose canvas will not be read is photographed instead", async () => {
+    // Ultimate Guitar's "Official" tabs draw the score onto a canvas the page
+    // will not hand over — through WebGL, or from a worker. There are no
+    // pixels to take, only a rectangle on the screen, so the popup photographs
+    // the window with tabs.captureVisibleTab and reads that instead.
+    const drawn = ["|--0--2--3--2--|--0--------|", "|--------------|--1--------|", "|--------------|--0--------|", "|--2--2--2--2--|--2--------|", "|--------------|--3--------|", "|--3-----------|-----------|"].join("\n");
+    const picture = renderTab(drawn, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+    // A photograph arrives at the screen's own resolution, which is twice the
+    // page's measurements on any ordinary laptop. Getting that scale wrong is
+    // the whole difficulty of this route, so the test uses a screen where it
+    // is wrong by a factor of two if it is not worked out from the picture.
+    const dpr = 2;
+    const rect = { x: 30, y: 40, width: picture.width / dpr, height: picture.height / dpr };
+    const view = { width: Math.ceil(rect.x + rect.width + 30), height: Math.ceil(rect.y + rect.height + 30), dpr };
+    const photo = createImage(view.width * dpr, view.height * dpr, 255);
+    for (let y = 0; y < picture.height; y++) {
+      for (let x = 0; x < picture.width; x++) photo.gray[(y + rect.y * dpr) * photo.width + x + rect.x * dpr] = picture.gray[y * picture.width + x];
+    }
+    const shots = [{ reason: "no-2d-context", width: picture.width, height: picture.height, rect, scroll: { top: 0, height: 4000, visible: 500 } }];
+    const reply = { ok: true, filename: "Iron Maiden - The Trooper (tab).mid", kind: "tab", rhythmSource: "guessed", tuningId: "standard", tracks: ["Guitar (as tabbed)"], title: "The Trooper" };
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/iron-maiden/the-trooper-official-1935205",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", title: "The Trooper", artist: "Iron Maiden", shots, view },
+      photo: "data:image/png;base64," + Buffer.from(writePng(photo)).toString("base64"),
+      reply,
+    });
+
+    assert.equal(await visible(page, "#view-found"), true);
+    assert.equal(await text(page, "#found-label"), STRINGS.popup.foundPicture);
+    assert.equal(await text(page, "#song-title"), "The Trooper — Iron Maiden");
+    const box = await page.$eval("#paste-text", (el) => el.value);
+    assert.match(box, /^\|[-0-9|]+$/m);
+    assert.equal(box.split("\n").length, 6, "six strings, read off a photograph of the window");
+    // A photograph is a PNG on purpose: a JPEG's smudges turn 7s into 1s.
+    const shot = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "captureVisibleTab");
+    assert.deepEqual(shot[1], { windowId: 3, format: "png" }, "the window is named rather than left to be guessed at");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a player that cannot be photographed either says so, and does not throw", async () => {
+    const shots = [{ reason: "no-2d-context", width: 800, height: 400, rect: { x: 0, y: 0, width: 800, height: 400 }, scroll: null }];
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/x-official-1",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", shots, view: { width: 800, height: 600, dpr: 1 } },
+      photoFails: true,
+    });
+    assert.equal(await visible(page, "#view-notfound"), true);
+    assert.equal(await text(page, "#notfound-message"), STRINGS.popup.unsupported);
+    assert.equal(await visible(page, "#paste-body"), true);
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("\"read the whole song\" scrolls the page, joins the screenfuls and puts it back", async () => {
+    // One click reads the screenful that happens to be showing. This walks
+    // the rest of the page: read, scroll past the last whole staff, read
+    // again, and at the end put the page back where the person left it.
+    const screenful = (frets) => {
+      const drawn = [`|--${frets}--|`, "|-------|", "|--2----|", "|-------|", "|-------|", "|--3----|"].join("\n");
+      const picture = renderTab(drawn, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+      return {
+        ok: false,
+        reason: "unsupported",
+        site: "ultimate-guitar",
+        type: "official",
+        title: "The Trooper",
+        artist: "Iron Maiden",
+        score: [{ width: picture.width, height: picture.height, gray: Array.from(picture.gray), rect: { x: 0, y: 0, width: picture.width, height: picture.height }, scroll: { top: 0, height: 4000, visible: 500 } }],
+      };
+    };
+    const reply = { ok: true, filename: "Iron Maiden - The Trooper (tab).mid", kind: "tab", rhythmSource: "guessed", tuningId: "standard", tracks: ["Guitar (as tabbed)"], title: "The Trooper" };
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/iron-maiden/the-trooper-official-1935205",
+      // The first look and the loop's first pass see the same screenful: the
+      // page has not moved yet when the button is pressed.
+      extracts: [screenful("0"), screenful("0"), screenful("5"), screenful("7")],
+      scrolls: [
+        { was: 0, top: 400, moved: 400, height: 4000, visible: 500, atEnd: false },
+        { was: 400, top: 800, moved: 400, height: 4000, visible: 500, atEnd: false },
+        { was: 800, top: 3500, moved: 2700, height: 4000, visible: 500, atEnd: true },
+      ],
+      reply,
+    });
+
+    assert.equal(await visible(page, "#view-found"), true);
+    // One screenful so far, so the offer to read the rest is there.
+    assert.equal(await visible(page, "#whole-song"), true);
+    assert.equal(await text(page, "#whole-song"), STRINGS.popup.wholeSong);
+    const first = await page.$eval("#paste-text", (el) => el.value);
+    assert.equal(first.split("\n").length, 6);
+
+    await page.click("#whole-song");
+    await page.waitForFunction(() => !document.getElementById("whole-song").disabled);
+    await page.waitForSelector("#whole-song-status:not([hidden])");
+    assert.equal(await visible(page, "#whole-song-status"), true);
+    assert.match(await text(page, "#whole-song-status"), /whole song/i);
+    assert.equal(await visible(page, "#whole-song"), false, "and nothing left to offer: it is all read");
+
+    const box = await page.$eval("#paste-text", (el) => el.value);
+    const blocks = box.split("\n\n");
+    assert.equal(blocks.length, 3, "three screenfuls, joined in the order they were read");
+    assert.notEqual(blocks[0], blocks[1]);
+    assert.equal(blocks[0], first, "and the first of them is what one click had already read");
+    // The share-of-the-song line goes away: there is no share left.
+    assert.equal(await visible(page, "#picture-partial"), false);
+
+    const scrolls = (await page.evaluate(() => window.__calls)).filter((c) => c[0] === "scroll");
+    assert.equal(scrolls.length, 4, "three steps down the page, then home again");
+    assert.ok(scrolls[0][1][0] > 0, "each step is worked out from where the last whole staff ended");
+    assert.deepEqual(scrolls[3][1].slice(0, 2), [0, 0], "and the page is put back where it was found");
+
+    // What was read is still this page's song, and still sendable.
+    await page.click("#main-button");
+    await page.waitForSelector("#view-success:not([hidden])");
+    const sent = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "sendMessage")[1];
+    assert.equal(sent.text, box);
+    assert.equal(sent.meta.title, "The Trooper");
+    assert.deepEqual(errors, []);
+  });
+
+  await t.test("a page that will not scroll is read once and says so", async () => {
+    const drawn = ["|--0----|", "|-------|", "|--2----|", "|-------|", "|-------|", "|--3----|"].join("\n");
+    const picture = renderTab(drawn, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+    const score = [{ width: picture.width, height: picture.height, gray: Array.from(picture.gray), rect: { x: 0, y: 0, width: picture.width, height: picture.height }, scroll: { top: 0, height: 4000, visible: 500 } }];
+    const { page, errors } = await open({
+      url: "https://tabs.ultimate-guitar.com/tab/x-official-1",
+      extract: { ok: false, reason: "unsupported", site: "ultimate-guitar", type: "official", title: "Stuck", artist: "Nobody", score },
+      scrolls: [{ was: 0, top: 0, moved: 0, height: 4000, visible: 500, atEnd: false }],
+    });
+    const before = await page.$eval("#paste-text", (el) => el.value);
+    await page.click("#whole-song");
+    await page.waitForFunction(() => !document.getElementById("whole-song").disabled);
+    assert.equal(await visible(page, "#whole-song-status"), true, "a reason nobody can see is no reason at all");
+    assert.equal(await text(page, "#whole-song-status"), STRINGS.popup.wholeSongNothing);
+    assert.equal(await page.$eval("#paste-text", (el) => el.value), before, "what was already read is left alone");
     assert.deepEqual(errors, []);
   });
 

@@ -17,19 +17,29 @@ const sites = { ultimateGuitar: extractUltimateGuitar, generic: extractGeneric, 
 
 /**
  * A <canvas> with something painted on it, of the shape the extractor uses:
- * width and height, a 2d context that hands back RGBA, and a parent that
- * scrolls. `picture` is grey, one byte a pixel.
+ * width and height, a 2d context that hands back RGBA, somewhere on the
+ * screen, and a parent that scrolls. `picture` is grey, one byte a pixel.
+ *
+ * `refuses` is the name of the DOMException it throws when asked for its
+ * pixels; `webgl` makes it a canvas with no 2d context at all; `at` puts it
+ * somewhere other than the top left of the window.
  */
-function canvas(picture, { scroll = null, refuses = false, webgl = false, alpha = 255 } = {}) {
+function canvas(picture, { scroll = null, refuses = null, webgl = false, at = { x: 0, y: 0 }, alpha = 255 } = {}) {
   const node = el("canvas", {});
   node.width = picture.width;
   node.height = picture.height;
+  node.getBoundingClientRect = () => (at ? { left: at.x, top: at.y, width: at.width || picture.width, height: at.height || picture.height } : { left: 0, top: 0, width: 0, height: 0 });
   node.getContext = (kind) => {
     if (kind !== "2d" || webgl) return null;
     return {
       getImageData(x, y, w, h) {
-        // A canvas holding pixels from another site throws instead of answering.
-        if (refuses) throw new Error("The operation is insecure.");
+        // A canvas holding pixels from another site, or one drawn in a
+        // worker, throws instead of answering.
+        if (refuses) {
+          const err = new Error("the canvas would not hand its pixels over");
+          err.name = refuses;
+          throw err;
+        }
         const data = new Uint8ClampedArray(w * h * 4);
         for (let i = 0; i < w * h; i++) {
           const v = picture.gray[i];
@@ -250,7 +260,8 @@ test("a successful extraction reports the running build", () => {
 test("findScoreImages: a canvas with music on it comes back as pixels", () => {
   const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
   const doc = document({ hostname: "tabs.ultimate-guitar.com", title: "(1) OFFICIAL THE TROOPER CHORDS & TABS by Iron Maiden @ Ultimate-Guitar.Com", body: [el("div", {}, [canvas(picture, { scroll: { top: 0, height: 8133, visible: 887 } })])] });
-  const [found, ...rest] = findScoreImages(doc);
+  const { images, skipped, shots } = findScoreImages(doc);
+  const [found, ...rest] = images;
   assert.equal(rest.length, 0);
   assert.equal(found.width, picture.width);
   assert.equal(found.height, picture.height);
@@ -258,6 +269,66 @@ test("findScoreImages: a canvas with music on it comes back as pixels", () => {
   assert.ok(found.content > 0.002 && found.content < 0.5, `${found.content} of it should be ink`);
   // How much of the score was on screen, so the popup can say so.
   assert.deepEqual(found.scroll, { top: 0, height: 8133, visible: 887 });
+  // A canvas we read is never photographed: we already have better pixels.
+  assert.deepEqual(skipped, []);
+  assert.deepEqual(shots, []);
+});
+
+test("findScoreImages: a canvas that will not hand its pixels over is offered as a photograph", () => {
+  // Ultimate Guitar's Official player: the score is on a canvas the page
+  // draws through WebGL, with a cursor layer over it that we may read and
+  // that has nothing on it. Reading the pixels is impossible; photographing
+  // the screen is not, so the rectangle comes back instead of nothing.
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const blank = { width: picture.width, height: picture.height, gray: new Uint8Array(picture.width * picture.height).fill(255) };
+  const doc = document({
+    hostname: "tabs.ultimate-guitar.com",
+    view: { width: 1280, height: 900, dpr: 2 },
+    body: [el("div", {}, [canvas(blank, { at: { x: 40, y: 120 } }), canvas(picture, { webgl: true, at: { x: 40, y: 120 } })])],
+  });
+  const { images, skipped, shots, view } = findScoreImages(doc);
+  assert.deepEqual(images, [], "there is nothing here we are allowed to read");
+  assert.deepEqual(
+    skipped.map((s) => s.reason),
+    ["blank", "no-2d-context"],
+    "and the reason for each is written down rather than swallowed"
+  );
+  assert.equal(shots.length, 1, "only the one whose pixels are out of reach is worth a photograph");
+  assert.equal(shots[0].reason, "no-2d-context");
+  assert.deepEqual(shots[0].rect, { x: 40, y: 120, width: picture.width, height: picture.height });
+  assert.deepEqual(view, { width: 1280, height: 900, dpr: 2 });
+});
+
+test("findScoreImages: a canvas off the bottom of the window is not photographed", () => {
+  // A photograph holds the window and no more, so there is no point offering
+  // one for a player the person has scrolled past.
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({ view: { width: 1280, height: 900, dpr: 1 }, body: [el("div", {}, [canvas(picture, { webgl: true, at: { x: 40, y: 1400 } })])] });
+  const { images, skipped, shots } = findScoreImages(doc);
+  assert.deepEqual(images, []);
+  assert.deepEqual(skipped.map((s) => s.reason), ["no-2d-context"]);
+  assert.deepEqual(shots, []);
+});
+
+test("findScoreImages: a refusal is named by what the browser called it", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({
+    body: [
+      el("div", {}, [
+        canvas(picture, { refuses: "SecurityError" }), // pixels from another site
+        canvas(picture, { refuses: "InvalidStateError" }), // control passed to a worker
+        canvas(picture, { refuses: "TypeError" }), // something else again
+      ]),
+    ],
+  });
+  const { skipped, shots } = findScoreImages(doc);
+  assert.deepEqual(
+    skipped.map((s) => s.reason),
+    ["blocked", "transferred", "unreadable"]
+  );
+  // All three are still on the screen, so all three could be photographed —
+  // but only as many as the popup will read.
+  assert.equal(shots.length, 2);
 });
 
 test("findScoreImages greys a see-through canvas exactly as the reader would", () => {
@@ -277,7 +348,7 @@ test("findScoreImages greys a see-through canvas exactly as the reader would", (
   }
   const picture = { width, height, gray };
   for (const alpha of [128, 199, 254]) {
-    const [found] = findScoreImages(document({ body: [el("div", {}, [canvas(picture, { alpha })])] }));
+    const [found] = findScoreImages(document({ body: [el("div", {}, [canvas(picture, { alpha })])] })).images;
     assert.ok(found, `alpha ${alpha} should still read as a score`);
     const data = new Uint8ClampedArray(size * 4);
     for (let i = 0; i < size; i++) {
@@ -297,15 +368,19 @@ test("findScoreImages: icons, blank overlays and canvases it may not read are sk
       el("div", {}, [
         canvas(tiny), // an avatar or a tuner dial
         canvas(blank), // the playing-cursor layer, painted on only while playing
-        canvas(picture, { refuses: true }), // pixels from another site
+        canvas(picture, { refuses: "SecurityError" }), // pixels from another site
         canvas(picture, { webgl: true }), // not a 2d canvas at all
         canvas(picture),
       ]),
     ],
   });
-  const found = findScoreImages(doc);
-  assert.equal(found.length, 1);
-  assert.equal(found[0].width, picture.width);
+  const { images, skipped } = findScoreImages(doc);
+  assert.equal(images.length, 1);
+  assert.equal(images[0].width, picture.width);
+  assert.deepEqual(
+    skipped.map((s) => s.reason),
+    ["tiny", "blank", "blocked", "no-2d-context"]
+  );
 });
 
 test("extractFromPage: a page with no text but a score on a canvas hands back the pixels", () => {
@@ -320,6 +395,7 @@ test("extractFromPage: a page with no text but a score on a canvas hands back th
   assert.equal(r.reason, "unsupported");
   assert.equal(r.score.length, 1);
   assert.equal(r.seen.canvases, 1);
+  assert.equal(r.shots, undefined, "there is nothing to photograph when the pixels are already in hand");
   // The song's name still comes off the page, even though its notes did not.
   assert.equal(r.title, "The Trooper");
   assert.equal(r.artist, "Iron Maiden");
@@ -339,6 +415,27 @@ test("extractFromPage: a page with neither text nor a canvas is unchanged", () =
   assert.equal(r.reason, "none");
   assert.equal(r.score, undefined);
   assert.equal(r.seen.canvases, 0);
+  assert.equal(r.seen.canvasSkipped, undefined);
+});
+
+test("extractFromPage: a player whose canvas is out of reach comes back as a rectangle to photograph", () => {
+  const picture = renderTab(DRAWN_TAB, { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const doc = document({
+    hostname: "tabs.ultimate-guitar.com",
+    title: "(1) OFFICIAL THE TROOPER CHORDS & TABS by Iron Maiden @ Ultimate-Guitar.Com",
+    view: { width: 1280, height: 900, dpr: 2 },
+    body: [el("div", {}, [canvas(picture, { webgl: true, at: { x: 12, y: 60 } })])],
+  });
+  const r = extractFromPage(doc, shape, sites);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "unsupported");
+  assert.equal(r.score, undefined);
+  assert.equal(r.shots.length, 1);
+  assert.deepEqual(r.view, { width: 1280, height: 900, dpr: 2 });
+  // The one line in the console that says which kind of nothing this was.
+  assert.equal(r.seen.canvases, 0);
+  assert.equal(r.seen.canvasSkipped, `${picture.width}x${picture.height} no-2d-context`);
+  assert.equal(r.title, "The Trooper");
 });
 
 test("the page title of a real Official tab is read the way the site writes it", () => {
