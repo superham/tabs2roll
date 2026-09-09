@@ -14,6 +14,7 @@
 // Pure ES module: no DOM, no browser APIs.
 
 import { toAsciiTab } from "./ascii.js";
+import { confidenceOf } from "./score.js";
 
 /**
  * A staff whose last line sits nearer than this to the bottom edge, measured
@@ -73,6 +74,13 @@ export function readTo(systems, height) {
  * Returns a reading of the same shape src/read/ hands back, so the popup can
  * treat a trimmed screenful and a whole picture alike. Null when there was
  * nothing whole in it to keep.
+ *
+ * Every count in it — notes, bars, marks given up on, and how sure the reader
+ * is — is worked out again from the staves that were kept. Carrying the whole
+ * picture's confidence across would be the reader saying how well it read
+ * something it then threw away: a screenful whose only bad staff was the one
+ * running off the bottom would come back looking far worse than the tab under
+ * it, and one whose good staff was the cut one, far better.
  */
 export function wholeReading(reading, options = {}) {
   if (!reading || !reading.ok || !Array.isArray(reading.systems)) return null;
@@ -81,16 +89,18 @@ export function wholeReading(reading, options = {}) {
   if (!tabs.length) return null;
   const text = toAsciiTab(whole, options);
   if (!text.trim()) return null;
+  const notes = tabs.reduce((n, s) => n + s.events.length, 0);
+  const unreadable = tabs.reduce((n, s) => n + s.unreadable, 0);
   return {
     ok: true,
     text,
     reason: null,
     staves: tabs.length,
     strings: tabs[0].strings,
-    notes: tabs.reduce((n, s) => n + s.events.length, 0),
+    notes,
     bars: tabs.reduce((n, s) => n + s.bars.length, 0),
-    unreadable: tabs.reduce((n, s) => n + s.unreadable, 0),
-    confidence: reading.confidence,
+    unreadable,
+    confidence: confidenceOf(tabs, unreadable, notes),
     systems: whole,
     scroll: reading.scroll || null,
   };

@@ -17,7 +17,7 @@ import { wholeSystems, wholeReading, readTo, stitchReads } from "../src/read/sti
 import { rowRuns, findStaffLines, groupSystems, findStaves, median, commonSize } from "../src/read/staff.js";
 import { eraseStaffLines, findComponents, holesOf, countHoles } from "../src/read/glyphs.js";
 import { classifyGlyph, normalizeGlyph, isMusicGlyph, MIN_CONFIDENCE } from "../src/read/digits.js";
-import { readSystem, joinDigits, columnsOf, staffKind } from "../src/read/score.js";
+import { readSystem, joinDigits, columnsOf, staffKind, confidenceOf } from "../src/read/score.js";
 import { systemToAscii } from "../src/read/ascii.js";
 import { readSheetMusic, REASONS } from "../src/read/index.js";
 import { convertText } from "../src/pipeline.js";
@@ -705,6 +705,30 @@ test("wholeReading: a screenful is cut down to the staves that were whole", () =
   assert.equal(wholeReading({ ...reading, height: reading.systems[0].bottom }), null);
   assert.equal(wholeReading({ ok: false, reason: "no-staves" }), null);
   assert.equal(wholeReading(null), null);
+});
+
+test("wholeReading: how sure it is follows the staves that were kept", () => {
+  const two = ["|--0--2--3--|", "|-----------|", "|--2--2--2--|", "|-----------|", "|-----------|", "|--3--------|"].join("\n");
+  const picture = renderTab([two, two].join("\n\n"), { spacing: 15, columnWidth: 8, digitHeight: 11, digitWidth: 7 });
+  const reading = readSheetMusic(picture);
+  assert.equal(reading.staves, 2);
+
+  // Make the staff that runs off the bottom of the screen the badly-read one:
+  // marks matched only loosely, and five it could not make out at all.
+  const cut = reading.systems[1];
+  for (const event of cut.events) event.score = 0.1;
+  cut.unreadable = 5;
+  const tabs = reading.systems.filter((s) => s.kind === "tab");
+  const spoiled = { ...reading, unreadable: 5, confidence: confidenceOf(tabs, 5, reading.notes) };
+  assert.ok(spoiled.confidence < 0.6, `the picture as a whole now reads badly (${spoiled.confidence})`);
+
+  // Trimmed to the one whole staff, none of that is in what was kept, so
+  // none of it may be in how sure the reader says it is.
+  const whole = wholeReading({ ...spoiled, height: cut.bottom });
+  assert.equal(whole.staves, 1);
+  assert.equal(whole.unreadable, 0, "not one of the marks it gave up on was kept");
+  assert.ok(whole.confidence > 0.8, `the kept staff read perfectly, so it should say so (${whole.confidence})`);
+  assert.equal(whole.confidence, confidenceOf(whole.systems, 0, whole.notes));
 });
 
 test("stitchReads: the screenfuls join in the order they were read", () => {

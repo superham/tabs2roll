@@ -26,13 +26,13 @@
 import { toInk, inkFraction } from "./image.js";
 import { findStaves } from "./staff.js";
 import { eraseStaffLines } from "./glyphs.js";
-import { readSystem } from "./score.js";
+import { readSystem, confidenceOf } from "./score.js";
 import { toAsciiTab } from "./ascii.js";
 
 export { toInk, toGray, inkFraction } from "./image.js";
 export { findStaffLines, groupSystems, findStaves } from "./staff.js";
 export { classifyGlyph } from "./digits.js";
-export { readSystem, columnsOf } from "./score.js";
+export { readSystem, columnsOf, confidenceOf } from "./score.js";
 export { toAsciiTab, systemToAscii } from "./ascii.js";
 export { wholeSystems, wholeReading, readTo, stitchReads, EDGE_MARGIN } from "./stitch.js";
 
@@ -99,29 +99,6 @@ export function readSheetMusic(image, options = {}) {
     ink,
     systems,
   };
-}
-
-/**
- * How much the reader believes itself, 0 to 1.
- *
- * Two things pull it down: marks it could not make out at all, and marks it
- * matched only loosely. Shown to the user rather than kept quiet, because the
- * honest answer to "is this right?" on a blurry screenshot is "probably not,
- * have a look".
- */
-export function confidenceOf(systems, unreadable, notes) {
-  let total = 0;
-  let count = 0;
-  for (const system of systems) {
-    for (const event of system.events) {
-      total += Math.min(1, event.score);
-      count++;
-    }
-  }
-  if (!count) return 0;
-  const mean = total / count;
-  const missed = unreadable / (notes + unreadable);
-  return Math.max(0, Math.min(1, mean * (1 - missed)));
 }
 
 function empty(reason, extra) {
