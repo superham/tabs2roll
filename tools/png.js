@@ -42,7 +42,9 @@ export function readPng(bytes) {
     const length = view.getUint32(at);
     const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
     const start = at + 8;
-    if (start + length > bytes.length) break;
+    // Body plus the four-byte CRC that follows it. A file cut short after the
+    // body would otherwise pass as a whole chunk and decode to nonsense.
+    if (start + length + 4 > bytes.length) break;
     if (type === "IHDR") {
       header = {
         width: view.getUint32(start),

@@ -42,7 +42,10 @@ function grayscaleOf(data, length) {
       continue;
     }
     const lum = (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
-    gray[i] = alpha === 255 ? lum : 255 - (((255 - lum) * alpha) / 255 | 0);
+    // Floor the blended value, not the amount blended in: read/image.js
+    // rounds the same way, so the same pixels give the same grey whichever
+    // path read them.
+    gray[i] = alpha === 255 ? lum : (255 - ((255 - lum) * alpha) / 255) | 0;
     if (gray[i] < 128) dark++;
   }
   // How much of the picture is the minority colour: ink on paper, or paper on

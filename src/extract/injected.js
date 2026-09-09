@@ -1,13 +1,13 @@
 /* GENERATED FILE — do not edit by hand. Rebuild with: npm run build
  * Built from: src/parse/tabshape.js, src/extract/sites/ultimate-guitar.js, src/extract/sites/generic.js, src/extract/sites/score-canvas.js, src/extract/sites/page.js
- * Build: f4bb43b8
+ * Build: dbd06d10
  *
  * This is the only code tab2roll ever runs inside a web page. It is injected
  * on toolbar click (activeTab), reads the page's DOM, returns plain data, and
  * touches nothing else: no UI, no styles, no storage, no network. */
 (() => {
 "use strict";
-const EXTRACTOR_BUILD = "f4bb43b8";
+const EXTRACTOR_BUILD = "dbd06d10";
 
 // ---- src/parse/tabshape.js ----
 // Shape heuristics — the shared, tested functions that decide whether a blob
@@ -461,7 +461,10 @@ function grayscaleOf(data, length) {
       continue;
     }
     const lum = (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
-    gray[i] = alpha === 255 ? lum : 255 - (((255 - lum) * alpha) / 255 | 0);
+    // Floor the blended value, not the amount blended in: read/image.js
+    // rounds the same way, so the same pixels give the same grey whichever
+    // path read them.
+    gray[i] = alpha === 255 ? lum : (255 - ((255 - lum) * alpha) / 255) | 0;
     if (gray[i] < 128) dark++;
   }
   // How much of the picture is the minority colour: ink on paper, or paper on

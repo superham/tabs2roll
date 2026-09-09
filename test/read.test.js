@@ -591,6 +591,26 @@ test("PNG: the project's own screenshots decode", () => {
   }
 });
 
+test("PNG: a file cut short after a chunk body is turned down, not decoded", () => {
+  // The four bytes after a chunk's body are its CRC. A file that ends where
+  // the body ends still has a whole body, so without checking for the CRC the
+  // reader would accept the chunk, run out of input, and hand back a picture
+  // built from a truncated stream instead of saying the file is broken.
+  const picture = renderTab(["|--3--5--|", "|--------|", "|--------|", "|--------|", "|--------|", "|--------|"].join("\n"));
+  const bytes = writePng(picture);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let at = 8;
+  let bodyEnd = null;
+  while (at + 8 <= bytes.length) {
+    const length = view.getUint32(at);
+    const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
+    if (type === "IDAT") bodyEnd = at + 8 + length;
+    at = at + 8 + length + 4;
+  }
+  assert.ok(bodyEnd, "the fixture should hold an IDAT chunk");
+  assert.throws(() => readPng(bytes.subarray(0, bodyEnd)));
+});
+
 test("PNG: anything else is turned down with a plain reason", () => {
   assert.equal(isPng(new Uint8Array([1, 2, 3])), false);
   assert.throws(() => readPng(new Uint8Array([1, 2, 3])), /not a PNG/);

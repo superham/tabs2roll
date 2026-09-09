@@ -40,7 +40,7 @@ export function toGray(image) {
       continue;
     }
     const lum = (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
-    gray[i] = alpha === 255 ? lum : 255 - (((255 - lum) * alpha) / 255) | 0;
+    gray[i] = alpha === 255 ? lum : (255 - ((255 - lum) * alpha) / 255) | 0;
   }
   return { width, height, gray };
 }

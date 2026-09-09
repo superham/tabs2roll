@@ -8,6 +8,7 @@ import { extractUltimateGuitar, parseUltimateGuitarTitle, findInJson, isUltimate
 import { extractGeneric, cleanPageTitle, isPlayerOnlyHost } from "../src/extract/sites/generic.js";
 import { extractFromPage, describePage } from "../src/extract/sites/page.js";
 import { findScoreImages } from "../src/extract/sites/score-canvas.js";
+import { toGray } from "../src/read/image.js";
 import { renderTab } from "./helpers/draw.js";
 import { buildInjected, OUTPUT } from "../tools/build-injected.js";
 
@@ -19,7 +20,7 @@ const sites = { ultimateGuitar: extractUltimateGuitar, generic: extractGeneric, 
  * width and height, a 2d context that hands back RGBA, and a parent that
  * scrolls. `picture` is grey, one byte a pixel.
  */
-function canvas(picture, { scroll = null, refuses = false, webgl = false } = {}) {
+function canvas(picture, { scroll = null, refuses = false, webgl = false, alpha = 255 } = {}) {
   const node = el("canvas", {});
   node.width = picture.width;
   node.height = picture.height;
@@ -35,7 +36,7 @@ function canvas(picture, { scroll = null, refuses = false, webgl = false } = {})
           data[i * 4] = v;
           data[i * 4 + 1] = v;
           data[i * 4 + 2] = v;
-          data[i * 4 + 3] = 255;
+          data[i * 4 + 3] = alpha;
         }
         return { data, width: w, height: h };
       },
@@ -257,6 +258,34 @@ test("findScoreImages: a canvas with music on it comes back as pixels", () => {
   assert.ok(found.content > 0.002 && found.content < 0.5, `${found.content} of it should be ink`);
   // How much of the score was on screen, so the popup can say so.
   assert.deepEqual(found.scroll, { top: 0, height: 8133, visible: 887 });
+});
+
+test("findScoreImages greys a see-through canvas exactly as the reader would", () => {
+  // Both paths blend transparency onto white, and they have to round it the
+  // same way: a grey one off here is a pixel the threshold can put on the
+  // other side of the ink line, so the same score would read differently
+  // depending on whether it came off the page or out of a dropped file.
+  // Solid black alone would not catch it — the blend only lands between two
+  // whole numbers when the pixel is a middling grey, so this picture is one.
+  const width = 240;
+  const height = 80;
+  const size = width * height;
+  const gray = new Uint8Array(size).fill(255);
+  for (let i = 0; i < size; i++) {
+    if (i % 25 === 0) gray[i] = 0; // ink, dark whatever the transparency
+    else if (i % 25 === 1) gray[i] = 1 + (i % 92); // the greys that round awkwardly
+  }
+  const picture = { width, height, gray };
+  for (const alpha of [128, 199, 254]) {
+    const [found] = findScoreImages(document({ body: [el("div", {}, [canvas(picture, { alpha })])] }));
+    assert.ok(found, `alpha ${alpha} should still read as a score`);
+    const data = new Uint8ClampedArray(size * 4);
+    for (let i = 0; i < size; i++) {
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = gray[i];
+      data[i * 4 + 3] = alpha;
+    }
+    assert.deepEqual(found.gray, toGray({ width, height, data }).gray, `alpha ${alpha} greys differently from read/image.js`);
+  }
 });
 
 test("findScoreImages: icons, blank overlays and canvases it may not read are skipped", () => {
