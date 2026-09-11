@@ -248,3 +248,68 @@ select {
   font-size: 11.5px;
   opacity: 0.75;
 }
+
+/* The one setting offered next to the button, with its explanation on hover. */
+.option-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.option-label input {
+  margin: 0;
+}
+
+.info {
+  display: inline-flex;
+}
+
+.info-icon {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--field-bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+}
+
+/*
+ * Above the row and the full width of it: a bubble hanging off the icon
+ * itself would run past the edge of a 340px window.
+ */
+.info-bubble {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+
+.info:hover .info-bubble,
+.info:focus-within .info-bubble {
+  display: block;
+}

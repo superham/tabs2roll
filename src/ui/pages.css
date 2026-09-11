@@ -183,3 +183,53 @@ nav.toc a {
 .top-link {
   font-size: 14px;
 }
+
+/* A setting and the info icon that explains it, side by side. */
+.option-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-row label {
+  margin: 8px 0;
+}
+
+.info {
+  display: inline-flex;
+}
+
+.info-icon {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+}
+
+.info-bubble {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 1;
+  width: min(440px, 100%);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+
+.info:hover .info-bubble,
+.info:focus-within .info-bubble {
+  display: block;
+}

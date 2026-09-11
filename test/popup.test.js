@@ -478,6 +478,46 @@ test("popup smoke test in Chromium", { skip: !playwright && "playwright not avai
     assert.deepEqual(errors, []);
   });
 
+  await t.test("the chords/bass/lead toggle: on by default, explains itself on hover, and is remembered", async () => {
+    const reply = { ok: true, filename: "A - B (tab).mid", kind: "tab", rhythmSource: "guessed", tuningId: "standard", tracks: ["Guitar (as tabbed)"], title: "B" };
+    const scenario = { url: "https://tabs.ultimate-guitar.com/x", extract: { ok: true, site: "ultimate-guitar", text: TAB, title: "B", artist: "A" }, reply };
+    const { page, errors } = await open(scenario);
+
+    // On by default, and offered next to the button rather than buried in settings.
+    assert.equal(await visible(page, "#arrange-toggle"), true);
+    assert.equal(await page.$eval("#arrange-toggle", (el) => el.checked), true);
+    assert.equal(await text(page, ".option-label"), STRINGS.extraTracks.label);
+
+    // The explanation is there for the reading, but only once asked for.
+    assert.equal(await visible(page, "#arrange-info-text"), false);
+    await page.hover("#arrange-info");
+    assert.equal(await visible(page, "#arrange-info-text"), true);
+    assert.equal(await text(page, "#arrange-info-text"), STRINGS.extraTracks.info);
+    // Reachable without a mouse: the same bubble opens on keyboard focus.
+    await page.$eval("#arrange-info", (el) => el.blur());
+    await page.focus("#arrange-info");
+    assert.equal(await visible(page, "#arrange-info-text"), true);
+    assert.equal(await page.$eval("#arrange-info", (el) => el.getAttribute("aria-label")), STRINGS.extraTracks.infoLabel);
+
+    // Turning it off asks for the guitar alone, and the choice is saved.
+    await page.uncheck("#arrange-toggle");
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("tab2roll:options")).arrange), false);
+    await page.click("#main-button");
+    await page.waitForSelector("#view-success:not([hidden])");
+    const sent = (await page.evaluate(() => window.__calls)).find((c) => c[0] === "sendMessage")[1];
+    assert.equal(sent.options.arrange, false);
+    assert.deepEqual(errors, []);
+
+    // A window opened later starts from the saved choice, not from the default.
+    const again = await open(scenario, { localStorage: { "tab2roll:options": JSON.stringify({ step: "1/8", arrange: false, splitSections: true }) } });
+    assert.equal(await again.page.$eval("#arrange-toggle", (el) => el.checked), false);
+    // And the settings page shows the same setting, because it is the same setting.
+    await again.page.goto(`http://127.0.0.1:${port}/ui/options.html`);
+    await again.page.waitForFunction(() => document.getElementById("arrange"));
+    assert.equal(await again.page.$eval("#arrange", (el) => el.checked), false);
+    assert.deepEqual(again.errors, []);
+  });
+
   await t.test("the other bundled pages load without errors and fill their strings", async () => {
     for (const path of ["ui/onboarding.html", "ui/help.html", "ui/options.html"]) {
       const context = await browser.newContext();

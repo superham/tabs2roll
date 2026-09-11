@@ -19,7 +19,8 @@ standard MIDI file you can open in your DAW.
 - Reads the song out of the page and leaves the rest behind: navigation, the
   chord-diagram legend, comments and the A-Z artist index never become bars of music.
 - Makes up to four tracks: the guitar exactly as tabbed, plus chords, bass and lead
-  worked out from it.
+  worked out from it. A checkbox beside the button turns those three off when you want
+  the guitar alone; the info icon next to it says what they are.
 - Zero network requests, no accounts, no telemetry. It reads the page you clicked on and
   writes one file. That's all.
 

@@ -4,7 +4,7 @@
 // Every user-facing string comes from src/strings.js. Real errors go to the
 // console; the user only ever sees plain language plus what to do next.
 
-import { fillStrings, browser, getOptions, getLastResult, setLastResult, getPictureRead, setPictureRead, openPage, getVersion, STRINGS } from "./common.js";
+import { fillStrings, browser, getOptions, setOptions, getLastResult, setLastResult, getPictureRead, setPictureRead, openPage, getVersion, STRINGS } from "./common.js";
 import { detect } from "../parse/index.js";
 import { SELECTABLE_TUNING_IDS } from "../parse/tuning.js";
 import { imageDataFromFile, imageDataFromShot, imageFileOf, readBestPicture, bestReading, coverageOf } from "./picture.js";
@@ -59,6 +59,19 @@ function show(viewId) {
 
 function setMainVisible(visible) {
   $("main-action").hidden = !visible;
+}
+
+/**
+ * The chords/bass/lead toggle, which sits right above the button because it
+ * changes what the file will hold. It is the same setting the settings page
+ * shows: whichever one you change, the other agrees next time it opens.
+ */
+function renderArrangeToggle() {
+  $("arrange-toggle").checked = getOptions().arrange !== false;
+}
+
+function onArrangeChange() {
+  setOptions({ ...getOptions(), arrange: $("arrange-toggle").checked });
 }
 
 function setPasteOpen(open) {
@@ -569,7 +582,9 @@ function saidAfterTheWalk(message) {
 
 function currentOptions() {
   const options = getOptions();
-  return { step: options.step, arrange: options.arrange !== false, splitSections: options.splitSections !== false };
+  // `arrange` comes off the checkbox rather than storage, so the file always
+  // matches what the window is showing even if the setting could not be saved.
+  return { step: options.step, arrange: $("arrange-toggle").checked, splitSections: options.splitSections !== false };
 }
 
 async function convert({ text, meta, options }) {
@@ -728,6 +743,7 @@ function showVersion() {
 
 function wireEvents() {
   $("main-button").addEventListener("click", onMainClick);
+  $("arrange-toggle").addEventListener("change", onArrangeChange);
   $("tuning-select").addEventListener("change", onTuningChange);
   $("convert-another").addEventListener("click", onConvertAnother);
   $("paste-toggle").addEventListener("click", () => setPasteOpen($("paste-body").hidden));
@@ -769,6 +785,7 @@ function wireEvents() {
 async function init() {
   fillStrings();
   showVersion();
+  renderArrangeToggle();
   buildTuningSelect();
   wireEvents();
   show("view-checking");

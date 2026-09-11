@@ -24,7 +24,13 @@
       <p class="hint" data-str="options.stepHint"></p>
 
       <h2 data-str="options.tracksHeading"></h2>
-      <label><input type="checkbox" id="arrange" /> <span data-str="options.arrangeLabel"></span></label>
+      <div class="option-row">
+        <label><input type="checkbox" id="arrange" /> <span data-str="options.arrangeLabel"></span></label>
+        <span class="info">
+          <button type="button" class="info-icon" id="arrange-info" aria-describedby="arrange-info-text" data-str="extraTracks.infoLabel" data-str-attr="aria-label">i</button>
+          <span class="info-bubble" role="tooltip" id="arrange-info-text" data-str="extraTracks.info"></span>
+        </span>
+      </div>
       <p class="hint" data-str="options.arrangeHint"></p>
 
       <h2 data-str="options.partsHeading"></h2>

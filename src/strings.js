@@ -81,6 +81,17 @@ export const STRINGS = {
     version: (number) => `Version ${number}`,
   },
 
+  /**
+   * The chords/bass/lead tracks the arranger works out from the tab. The
+   * wording is shared: the popup toggle and the settings page both explain
+   * the same three tracks, and they should not drift apart.
+   */
+  extraTracks: {
+    label: "Chords, bass and lead tracks",
+    infoLabel: "What are these tracks?",
+    info: "Only the guitar comes from the tab. The other three are worked out from it: Chords is a clean pad of every chord you strum, Bass follows the lowest note of each one, and Lead doubles the single-note runs. Turn this off for the guitar alone, exactly as tabbed.",
+  },
+
   tunings: {
     standard: "Standard (E A D G B E)",
     "drop-d": "Drop D",
@@ -144,6 +155,7 @@ export const STRINGS = {
     tracksBass: "Bass: the lowest note of every chord, in a bass register.",
     tracksLead: "Lead: the single-note melodies and solos.",
     tracksEmpty: "A track is left out when the tab has nothing for it.",
+    tracksOff: "Only the guitar comes from the tab; the other three are worked out from it. Clear \"Chords, bass and lead tracks\" above the button — or in Settings — to get the guitar alone, exactly as tabbed.",
 
     partsHeading: "The parts of the song",
     parts1: "Tabs mark their parts as they go — \"[Intro]\", \"Chorus:\", \"-- Guitar solo --\", or whatever the person who wrote it out reached for, in whatever language. tab2roll finds those callouts and puts a marker at each one, so your DAW shows the song laid out along the ruler instead of one long take.",

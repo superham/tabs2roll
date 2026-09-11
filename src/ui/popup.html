@@ -57,8 +57,15 @@
         <button id="convert-another" class="secondary" type="button" data-str="popup.convertAnother"></button>
       </section>
 
-      <!-- The one primary control -->
+      <!-- The one primary control, with the one choice worth making before it -->
       <div id="main-action" hidden>
+        <div class="option-row">
+          <label class="option-label"><input type="checkbox" id="arrange-toggle" /> <span data-str="extraTracks.label"></span></label>
+          <span class="info">
+            <button type="button" class="info-icon" id="arrange-info" aria-describedby="arrange-info-text" data-str="extraTracks.infoLabel" data-str-attr="aria-label">i</button>
+            <span class="info-bubble" role="tooltip" id="arrange-info-text" data-str="extraTracks.info"></span>
+          </span>
+        </div>
         <button id="main-button" class="primary" type="button">
           <span class="label" data-str="popup.mainButton"></span>
           <small id="main-subtext" data-str="popup.mainSubtext"></small>
